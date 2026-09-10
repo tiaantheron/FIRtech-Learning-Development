@@ -1,4 +1,4 @@
-"use client"
+
 
 import { useMemo, useState } from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react"
@@ -40,7 +40,7 @@ export function DataTable<T>({
     if (sortKey) {
       const col = columns.find((c) => c.key === sortKey)
       if (col) {
-        const val = col.sortValue ?? ((r: T) => String((r as Record<string, unknown>)[col.key] ?? ""))
+        const val = col.sortValue ?? ((r: T) => { const value = (r as Record<string, unknown>)[col.key]; return typeof value === "number" ? value : String(value ?? "") })
         out = [...out].sort((a, b) => {
           const av = val(a)
           const bv = val(b)
@@ -144,3 +144,4 @@ export function DataTable<T>({
     </div>
   )
 }
+

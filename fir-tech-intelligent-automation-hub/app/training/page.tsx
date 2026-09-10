@@ -1,4 +1,4 @@
-"use client"
+
 
 import { GraduationCap, Award, AlertTriangle, CircleCheck } from "lucide-react"
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
@@ -35,7 +35,7 @@ export default function TrainingPage() {
     "In Progress",
     "Exam Scheduled",
     "Awaiting Result",
-    "Failed",
+    "Failed", "Expired",
   ])
   const outstanding = data.trainingAssignments.filter((t) => OUTSTANDING.has(t.status))
 
@@ -64,7 +64,7 @@ export default function TrainingPage() {
       sortValue: (t) => t.dueDate ?? "",
       render: (t) => {
         const d = daysUntil(t.dueDate)
-        const overdue = d !== null && d < 0
+        const overdue = d !== null && d < 0 && OUTSTANDING.has(t.status)
         return (
           <span className={overdue ? "font-medium text-destructive" : ""}>
             {formatDate(t.dueDate)}
@@ -158,3 +158,5 @@ export default function TrainingPage() {
     </div>
   )
 }
+
+

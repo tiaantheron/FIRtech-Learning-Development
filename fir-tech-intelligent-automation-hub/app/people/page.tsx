@@ -1,4 +1,4 @@
-"use client"
+
 
 import { useMemo, useState } from "react"
 import { X } from "lucide-react"
@@ -14,7 +14,7 @@ import { formatDate } from "@/lib/utils/format"
 import type { Person } from "@/lib/models/types"
 
 export default function PeoplePage() {
-  const data = useWorkbookData()
+  const data = useWorkbookData(false)
   const [deptFilter, setDeptFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selected, setSelected] = useState<string | null>(null)
@@ -103,7 +103,7 @@ export default function PeoplePage() {
 }
 
 function PersonDetail({ personId, onClose }: { personId: string; onClose: () => void }) {
-  const data = useWorkbookData()
+  const data = useWorkbookData(false)
   if (!data) return null
   const person = data.people.find((p) => p.personId === personId)
   if (!person) return null
@@ -163,3 +163,4 @@ function PersonDetail({ personId, onClose }: { personId: string; onClose: () => 
     </Card>
   )
 }
+

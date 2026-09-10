@@ -9,6 +9,7 @@ export interface ColumnDef {
   type: ColumnType
   required?: boolean
   unique?: boolean
+  optional?: boolean
 }
 
 export interface SheetDef {
@@ -88,6 +89,7 @@ export const SHEET_DEFS: Record<string, SheetDef> = {
       { key: "issueDate", header: "IssueDate", type: "date" },
       { key: "expiryDate", header: "ExpiryDate", type: "date" },
       { key: "uiPathCertCode", header: "UiPathCertCode", type: "string" },
+      { key: "dueDate", header: "DueDate", type: "date", optional: true },
     ],
   },
   leads: {
@@ -142,6 +144,8 @@ export const SHEET_DEFS: Record<string, SheetDef> = {
     sheet: "Engagements",
     columns: [
       { key: "engagementId", header: "EngagementId", type: "string", required: true, unique: true },
+      { key: "departmentId", header: "DepartmentId", type: "string", optional: true },
+      { key: "owner", header: "Owner", type: "string", optional: true },
       { key: "customer", header: "Customer", type: "string", required: true },
       { key: "name", header: "Name", type: "string", required: true },
       { key: "type", header: "Type", type: "string", required: true },
@@ -190,6 +194,7 @@ export const SHEET_DEFS: Record<string, SheetDef> = {
 
 function requirementColumns(): ColumnDef[] {
   return [
+    { key: "departmentId", header: "DepartmentId", type: "string", optional: true },
     { key: "requirementId", header: "RequirementId", type: "string", required: true, unique: true },
     { key: "requirement", header: "Requirement", type: "string", required: true },
     { key: "requiredValue", header: "RequiredValue", type: "number" },
@@ -202,3 +207,12 @@ function requirementColumns(): ColumnDef[] {
 }
 
 export const REQUIRED_SHEETS = Object.values(SHEET_DEFS).map((d) => d.sheet)
+
+export const FX_COLUMNS: ColumnDef[] = [
+  { key: "reportingCurrency", header: "ReportingCurrency", type: "string", optional: true },
+  { key: "convertedAmount", header: "ConvertedAmount", type: "number", optional: true },
+  { key: "exchangeRate", header: "ExchangeRate", type: "number", optional: true },
+  { key: "exchangeRateDate", header: "ExchangeRateDate", type: "date", optional: true },
+  { key: "exchangeRateSource", header: "ExchangeRateSource", type: "string", optional: true },
+]
+for (const key of ["leads", "opportunities", "revenue", "engagements"]) SHEET_DEFS[key].columns.push(...FX_COLUMNS)

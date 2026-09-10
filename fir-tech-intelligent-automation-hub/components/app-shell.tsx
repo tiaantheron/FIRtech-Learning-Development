@@ -1,8 +1,8 @@
-"use client"
+
 
 import { useRef, useState } from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { Link, useLocation } from "react-router-dom"
+
 import {
   LayoutDashboard,
   Building2,
@@ -15,6 +15,7 @@ import {
   FileText,
   ShieldAlert,
   Upload,
+  FileDown,
   RefreshCw,
   Menu,
   X,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils"
 import { useWorkbook } from "@/lib/workbook-context"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils/format"
+import { WorkbookEditor } from "./workbook-editor"
 
 interface NavItem {
   href: string
@@ -45,8 +47,10 @@ const NAV: NavItem[] = [
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
-  const { result, loading, loadFromFile, loadSample, error } = useWorkbook()
+  const { pathname } = useLocation()
+  const { result, loading, loadFromFile, refresh, exportWorkbook, error, dirty, undo, canUndo } = useWorkbook()
+  const [importOpen, setImportOpen] = useState(false)
+
   const fileInput = useRef<HTMLInputElement>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -54,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) loadFromFile(file)
+    if (file) { loadFromFile(file); setImportOpen(false) }
     e.target.value = ""
   }
 
@@ -63,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <input
         ref={fileInput}
         type="file"
-        accept=".xlsx,.xls"
+        accept=".xlsx"
         className="hidden"
         onChange={onFile}
         aria-hidden
@@ -72,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -93,7 +97,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                to={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -152,11 +156,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
+            <Button variant="outline" size="sm" aria-label="Open or replace workbook" disabled={loading} onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">{result ? "Replace" : "Upload"}</span>
+              <span className="hidden sm:inline">{result ? "Replace workbook" : "Open Excel"}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => loadSample()} disabled={loading}>
+            <Button variant="outline" size="sm" aria-label="Save Excel workbook" onClick={exportWorkbook} disabled={loading || !result}>
+              <FileDown className="h-4 w-4" /><span className="hidden sm:inline">Save Excel</span>
+            </Button>
+            <Button variant="outline" size="sm" aria-label="Refresh workbook" onClick={() => refresh()} disabled={loading || !result}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
@@ -164,6 +171,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6 lg:py-8">
+          {(!result || importOpen) && <section className="mb-6 rounded-xl border border-border bg-card p-6 sm:p-10" aria-labelledby="open-workbook-title">
+            <FileDown className="mb-4 h-9 w-9 text-primary" />
+            <h1 id="open-workbook-title" className="text-2xl font-semibold">Open your Excel workbook</h1>
+            <p className="mt-3 max-w-2xl text-muted-foreground">Choose an .xlsx file from any folder or accessible drive on your computer. Use the FIRtech reference layout or the detailed 14-sheet format.</p>
+            <p className="my-5 text-sm text-muted-foreground">Reporting defaults to South African rand (ZAR). Original transaction currencies are retained.</p>
+            <div className="flex flex-wrap items-center gap-4"><Button disabled={loading} onClick={() => fileInput.current?.click()}><Upload className="h-4 w-4" />Choose Excel file</Button><a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
+            <p className="mt-5 text-sm text-muted-foreground">Files stay in your browser. Edit entries within each section, then Save Excel to write the updated workbook. Use Reports for filtered exports.</p>
+          </section>}
+          {result && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>{dirty ? "Unsaved workbook changes — use Save Excel to keep them." : "Workbook is up to date."}</span><Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || loading}>Undo last change</Button></div>}
+          {result && <WorkbookEditor key={pathname} route={pathname} />}
+          {errorCount > 0 && <div role="alert" className="mb-5 rounded-lg border border-destructive p-4 text-sm">Calculations paused: {errorCount} workbook errors. <Link className="underline font-semibold" to="/validation">Open validation report</Link> and correct the workbook before replacing it.</div>}
+          {result?.data && result.issues.some(i => i.severity === "warning") && <p className="mb-4 rounded-lg border border-border bg-card p-3 text-sm">Workbook loaded with {result.issues.filter(i => i.severity === "warning").length} notes about its data. <Link to="/validation" className="font-medium underline">Review import notes</Link>{result.data.overview.find(s => s.key === "DataStatus") && <span className="ml-2">Source status: {result.data.overview.find(s => s.key === "DataStatus")?.value}</span>}</p>}
           {error ? (
             <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
@@ -174,7 +193,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Loading workbook…
             </div>
           ) : (
-            children
+            result ? children : null
           )}
         </main>
       </div>
@@ -192,3 +211,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+
+
+
+

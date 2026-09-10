@@ -1,4 +1,4 @@
-"use client"
+
 
 import { Handshake, CircleCheck, Star, Users } from "lucide-react"
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
@@ -13,6 +13,7 @@ import { DonutChart } from "@/components/charts"
 import { engagementMetrics } from "@/lib/calculations/metrics"
 import { formatCurrency } from "@/lib/utils/format"
 import type { Engagement } from "@/lib/models/types"
+import { CurrencyDetails } from "@/components/currency-details"
 
 export default function EngagementsPage() {
   const { filters } = useWorkbook()
@@ -31,6 +32,7 @@ export default function EngagementsPage() {
   const columns: Column<Engagement>[] = [
     { key: "customer", header: "Customer", sortable: true, render: (e) => <span className="font-medium">{e.customer}</span> },
     { key: "name", header: "Engagement", sortable: true },
+    { key: "conversion", header: "Reporting / FX", render: e => <CurrencyDetails record={e} amount={e.contractValue} /> },
     {
       key: "type",
       header: "Category",
@@ -63,7 +65,7 @@ export default function EngagementsPage() {
         <KpiCard label="Total engagements" value={eng.total} icon={Handshake} />
         <KpiCard label="Qualifying" value={eng.qualifying} icon={CircleCheck} tone="success" />
         <KpiCard label="Unique PS" value={eng.uniqueProfessionalServices} icon={Star} tone="services" sublabel="De-duplicated by customer" />
-        <KpiCard label="Non-qualifying" value={eng.nonQualifying} icon={Users} tone="muted" />
+        <KpiCard label="Non-qualifying" value={eng.nonQualifying} icon={Users} tone="default" />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
@@ -78,9 +80,9 @@ export default function EngagementsPage() {
         <div className="space-y-3 lg:col-span-2">
           <SectionHeading title="Qualification Readiness" />
           <div className="grid gap-3 sm:grid-cols-2">
-            <ReadinessCard label="Resell customer engagements" value={eng.customer} hint="Count toward Resell pathway" tone="resell" />
+            <ReadinessCard label="Resell customer engagements" value={eng.customer} hint="Resell category; see qualification status" tone="resell" />
             <ReadinessCard label="Professional services" value={eng.professionalServices} hint="Includes unique PS" tone="services" />
-            <ReadinessCard label="Qualifying engagements" value={eng.qualifying} hint="NPS/CSAT & status qualified" tone="success" />
+            <ReadinessCard label="Qualifying engagements" value={eng.qualifying} hint="Qualification status supplied by workbook" tone="success" />
             <ReadinessCard label="Unique PS (deduped)" value={eng.uniqueProfessionalServices} hint="Distinct customers" tone="services" />
           </div>
         </div>
@@ -114,3 +116,6 @@ function ReadinessCard({
     </Card>
   )
 }
+
+
+

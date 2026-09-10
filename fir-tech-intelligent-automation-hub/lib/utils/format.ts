@@ -29,7 +29,9 @@ export function daysUntil(iso: string | null): number | null {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   const now = new Date()
-  return Math.round((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  return Math.round((target.getTime() - today.getTime()) / 86400000)
 }
 
 export function clampPct(value: number): number {

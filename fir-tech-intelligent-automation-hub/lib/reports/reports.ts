@@ -14,8 +14,11 @@ import {
   trainingMetrics,
   weightedValue,
   isCertValid,
+  effectiveProbability,
 } from "@/lib/calculations/metrics"
 import { daysUntil } from "@/lib/utils/format"
+import { filterWorkbook } from "@/lib/calculations/filter"
+import { conversionReport } from "@/lib/calculations/currency"
 
 export interface ReportDef {
   id: string
@@ -24,7 +27,7 @@ export interface ReportDef {
   build: (data: WorkbookData, filters: Filters) => ExportRow[]
 }
 
-export const REPORTS: ReportDef[] = [
+const definitions: ReportDef[] = [
   {
     id: "executive-readiness",
     name: "Executive Readiness Report",
@@ -83,6 +86,7 @@ export const REPORTS: ReportDef[] = [
         Customer: r.customer,
         Type: r.type,
         Amount: r.amount,
+        ...conversionReport(r, r.amount),
         Currency: r.currency,
         "Owner (counted)": departmentName(data, r.ownerDepartmentId),
         "Lead Origin": departmentName(data, r.leadOriginDepartmentId),
@@ -103,24 +107,25 @@ export const REPORTS: ReportDef[] = [
         Owner: personName(data, o.owner),
         Department: departmentName(data, o.departmentId),
         Value: o.estimatedValue,
+        ...conversionReport(o, o.estimatedValue),
         Currency: o.currency,
-        "Probability %": Math.round(o.probability * 100),
+        "Probability %": Math.round(effectiveProbability(o) * 100),
         Weighted: Math.round(weightedValue(o)),
         Stage: o.stage,
         Close: o.closeDate ?? "",
       }))
-      rows.push({
+      for (const currency of ["ZAR", "USD"] as const) { const pipe = pipelineMetrics(data, filters, currency); rows.push({
         Opportunity: "TOTAL",
         Customer: "",
         Owner: "",
         Department: "",
         Value: pipe.totalPipeline,
-        Currency: "ZAR",
+        Currency: currency,
         "Probability %": "",
         Weighted: Math.round(pipe.weightedPipeline),
         Stage: `Conversion ${pct(pipe.conversionRate)}`,
         Close: "",
-      })
+      }) }
       return rows
     },
   },
@@ -129,7 +134,7 @@ export const REPORTS: ReportDef[] = [
     name: "Training Outstanding Report",
     description: "All incomplete training assignments with due dates.",
     build: (data) => {
-      const OUTSTANDING = new Set(["Not Allocated", "Allocated", "Not Started", "In Progress", "Exam Scheduled", "Awaiting Result", "Failed"])
+      const OUTSTANDING = new Set(["Not Allocated", "Allocated", "Not Started", "In Progress", "Exam Scheduled", "Awaiting Result", "Failed", "Expired"])
       return data.trainingAssignments
         .filter((t) => OUTSTANDING.has(t.status))
         .map((t) => {
@@ -171,6 +176,7 @@ export const REPORTS: ReportDef[] = [
         Category: e.type,
         Qualification: e.qualificationStatus,
         "Contract Value": e.contractValue,
+        ...conversionReport(e, e.contractValue),
         Currency: e.currency,
         NPS: e.npsStatus,
         CSAT: e.csatStatus,
@@ -178,6 +184,8 @@ export const REPORTS: ReportDef[] = [
       })),
   },
 ]
+
+export const REPORTS: ReportDef[] = definitions.map(report => ({ ...report, build: (data, filters) => report.build(filterWorkbook(data, filters), filters) }))
 
 function requirementRows(reqs: WorkbookData["resellRequirements"]): ExportRow[] {
   return reqs.map((r) => ({
@@ -203,3 +211,4 @@ function pct(v: number): string {
 function money(v: number, currency = "ZAR"): string {
   return `${currency} ${Math.round(v || 0).toLocaleString()}`
 }
+

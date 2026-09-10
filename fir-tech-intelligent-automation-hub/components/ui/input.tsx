@@ -12,3 +12,4 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
     />
   )
 }
+

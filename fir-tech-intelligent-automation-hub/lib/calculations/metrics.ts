@@ -6,10 +6,13 @@ import type {
   WorkbookData,
 } from "@/lib/models/types"
 import { daysUntil } from "@/lib/utils/format"
+import { filterWorkbook, personInDepartment } from "./filter"
+import { reportingAmount } from "./currency"
 
 export interface Filters {
   periodId: string | "all"
   departmentId: string | "all"
+  employeeId?: string
 }
 
 export const EMPTY_FILTERS: Filters = { periodId: "all", departmentId: "all" }
@@ -18,7 +21,7 @@ function inPeriod(iso: string | null, data: WorkbookData, periodId: string): boo
   if (periodId === "all") return true
   const period = data.reportingPeriods.find((p) => p.periodId === periodId)
   if (!period || !period.startDate || !period.endDate) return true
-  if (!iso) return false
+  if (!iso) return true
   return iso >= period.startDate && iso <= period.endDate
 }
 
@@ -63,15 +66,18 @@ export function remainingValue(r: Requirement): number {
 
 // ---- Certifications ----
 export function isCertValid(data: WorkbookData, c: Certification): boolean {
+  const override = data.overrides.find(o => o.entityType === "Certification" && o.entityId === c.certificationId && o.field === "status")
+  if (override) return override.value === "Active" || override.value === "Passed"
   const passing = c.status === "Passed" || c.status === "Active"
   if (!passing) return false
-  const isExpired = c.status === "Expired" || (c.expiryDate ? (daysUntil(c.expiryDate) ?? 1) < 0 : false)
+  const isExpired = c.expiryDate ? (daysUntil(c.expiryDate) ?? 1) < 0 : false
   if (!isExpired) return true
   // Expired certs only count when explicitly overridden.
-  return hasOverride(data, "Certification", c.certificationId, "status")
+  return false
 }
 
 export interface CertMetrics {
+  outstanding: number
   completed: number
   expiring: number
   expired: number
@@ -80,7 +86,7 @@ export interface CertMetrics {
 }
 
 export function certMetrics(data: WorkbookData, filters = EMPTY_FILTERS): CertMetrics {
-  const certs = data.certifications.filter((c) => inPeriod(c.issueDate, data, filters.periodId))
+  const certs = filterWorkbook(data, filters).certifications
   let completed = 0
   let expiring = 0
   let expired = 0
@@ -88,12 +94,12 @@ export function certMetrics(data: WorkbookData, filters = EMPTY_FILTERS): CertMe
   for (const c of certs) {
     const valid = isCertValid(data, c)
     const days = daysUntil(c.expiryDate)
-    if (c.status === "Expired" || (days !== null && days < 0 && !valid)) expired++
-    else if (valid && days !== null && days <= 60) expiring++
+    if (!valid && (c.status === "Expired" || (days !== null && days < 0))) expired++
+    else if (valid && days !== null && days >= 0 && days <= 60) expiring++
     if (valid) completed++
-    if (c.status === "In Progress" || c.status === "Scheduled" || c.status === "Not Started") inProgress++
+    if (!valid && c.status !== "Waived" && c.status !== "Not Applicable" && c.status !== "Expired" && !(days !== null && days < 0)) inProgress++
   }
-  return { completed, expiring, expired, inProgress, total: certs.length }
+  return { completed, expiring, expired, inProgress, outstanding: expired + inProgress, total: certs.length }
 }
 
 // ---- Training ----
@@ -104,7 +110,7 @@ const OUTSTANDING_TRAINING = new Set([
   "In Progress",
   "Exam Scheduled",
   "Awaiting Result",
-  "Failed",
+  "Failed", "Expired",
 ])
 
 export interface TrainingMetrics {
@@ -116,7 +122,7 @@ export interface TrainingMetrics {
 }
 
 export function trainingMetrics(data: WorkbookData, filters = EMPTY_FILTERS): TrainingMetrics {
-  const items = data.trainingAssignments.filter((t) => inPeriod(t.assignedDate, data, filters.periodId))
+  const items = filterWorkbook(data, filters).trainingAssignments
   let outstanding = 0
   let completed = 0
   let overdue = 0
@@ -135,9 +141,13 @@ export function trainingMetrics(data: WorkbookData, filters = EMPTY_FILTERS): Tr
 // ---- Pipeline ----
 export function weightedValue(o: Opportunity): number {
   const stage = o.stage.toLowerCase()
-  if (stage.includes("won")) return o.estimatedValue
-  if (stage.includes("lost")) return 0
+  if (stage === "closed won") return o.estimatedValue
+  if (stage === "closed lost") return 0
   return o.estimatedValue * o.probability
+}
+
+export function effectiveProbability(o: Opportunity): number {
+  return o.stage.toLowerCase() === "closed won" ? 1 : o.stage.toLowerCase() === "closed lost" ? 0 : o.probability
 }
 
 export interface PipelineMetrics {
@@ -150,7 +160,8 @@ export interface PipelineMetrics {
   conversionRate: number
 }
 
-export function pipelineMetrics(data: WorkbookData, filters = EMPTY_FILTERS): PipelineMetrics {
+export function pipelineMetrics(data: WorkbookData, filters = EMPTY_FILTERS, currency: "USD" | "ZAR" = "ZAR"): PipelineMetrics {
+  data = filterWorkbook(data, filters)
   const leads = data.leads.filter(
     (l) =>
       inPeriod(l.createdDate, data, filters.periodId) &&
@@ -169,17 +180,17 @@ export function pipelineMetrics(data: WorkbookData, filters = EMPTY_FILTERS): Pi
   let closed = 0
   let open = 0
   for (const o of opps) {
+    const value = currency === "ZAR" ? reportingAmount(o.estimatedValue, o) : o.currency === currency ? o.estimatedValue : null
     const stage = o.stage.toLowerCase()
-    if (stage.includes("won")) {
-      wonRevenue += o.estimatedValue
+    if (stage === "closed won") {
+      wonRevenue += value ?? 0
       won++
       closed++
-    } else if (stage.includes("lost")) {
-      lostRevenue += o.estimatedValue
+    } else if (stage === "closed lost") {
+      lostRevenue += value ?? 0
       closed++
     } else {
-      totalPipeline += o.estimatedValue
-      weightedPipeline += weightedValue(o)
+      if (value !== null) { totalPipeline += value; weightedPipeline += value * effectiveProbability(o) }
       open++
     }
   }
@@ -210,7 +221,7 @@ export function revenueMetrics(data: WorkbookData, filters = EMPTY_FILTERS): Rev
       (filters.departmentId === "all" || r.ownerDepartmentId === filters.departmentId),
   )
   // Only the owning department is counted to prevent double counting.
-  const attainedZAR = records.filter((r) => r.currency === "ZAR").reduce((s, r) => s + r.amount, 0)
+  const attainedZAR = records.reduce((s, r) => s + (reportingAmount(r.amount, r) ?? 0), 0)
   const attainedUSD = records.filter((r) => r.currency === "USD").reduce((s, r) => s + r.amount, 0)
 
   let targetZAR = 0
@@ -241,7 +252,7 @@ export interface EngagementMetrics {
 }
 
 export function engagementMetrics(data: WorkbookData, filters = EMPTY_FILTERS): EngagementMetrics {
-  const items = data.engagements.filter((e) => inPeriod(e.date, data, filters.periodId))
+  const items = filterWorkbook(data, filters).engagements
   const uniqueCustomers = new Set<string>()
   let customer = 0
   let ps = 0
@@ -250,7 +261,7 @@ export function engagementMetrics(data: WorkbookData, filters = EMPTY_FILTERS): 
   for (const e of items) {
     if (e.type === "Resell Customer Engagement") customer++
     if (e.type === "Professional Services Engagement" || e.type === "Unique Professional Services Engagement") ps++
-    if (e.type === "Unique Professional Services Engagement") uniqueCustomers.add(e.customer.toLowerCase())
+    if (e.type === "Unique Professional Services Engagement" && e.qualificationStatus.toLowerCase() === "qualified") uniqueCustomers.add(e.customer.toLowerCase().trim())
     if (e.type === "Non-Qualifying Engagement") nonQualifying++
     else if (e.qualificationStatus.toLowerCase() === "qualified") qualifying++
   }
@@ -272,15 +283,16 @@ export interface RiskMetrics {
 }
 
 export function riskMetrics(data: WorkbookData, filters = EMPTY_FILTERS): RiskMetrics {
+  data = filterWorkbook(data, filters)
   const requirementsAtRisk = [...data.resellRequirements, ...data.servicesRequirements].filter((r) => {
     if (r.status !== "Outstanding") return false
     const days = daysUntil(r.dueDate)
-    return days !== null && days < 45
+    return days !== null && days <= 45
   }).length
 
   const overdueTraining = trainingMetrics(data, filters).overdue
   const overdueCertifications = data.certifications.filter((c) => {
-    const days = daysUntil(c.expiryDate)
+    const days = daysUntil(c.dueDate ?? c.expiryDate)
     return days !== null && days < 0 && !isCertValid(data, c)
   }).length
 
@@ -305,26 +317,24 @@ export interface DepartmentPerformance {
 
 export function departmentPerformance(data: WorkbookData): DepartmentPerformance[] {
   return data.departments.map((d) => {
-    const revenueAttainedZAR = data.revenue
-      .filter((r) => r.ownerDepartmentId === d.departmentId && r.currency === "ZAR")
-      .reduce((s, r) => s + r.amount, 0)
+    const revenueAttainedZAR = revenueMetrics(data, { departmentId: d.departmentId, periodId: "all" }).attainedZAR
     const opps = data.opportunities.filter((o) => o.departmentId === d.departmentId)
     const pipelineValue = opps
-      .filter((o) => !o.stage.toLowerCase().includes("won") && !o.stage.toLowerCase().includes("lost"))
-      .reduce((s, o) => s + o.estimatedValue, 0)
-    const weightedPipeline = opps.reduce((s, o) => s + weightedValue(o), 0)
+      .filter((o) => o.stage.toLowerCase() !== "closed won" && o.stage.toLowerCase() !== "closed lost")
+      .reduce((s, o) => s + (reportingAmount(o.estimatedValue, o) ?? 0), 0)
+    const weightedPipeline = pipelineMetrics(data, { periodId: "all", departmentId: d.departmentId }).weightedPipeline
     const leadCount = data.leads.filter((l) => l.departmentId === d.departmentId).length
 
     const deptPeople = new Set(
       data.people
-        .filter((p) => p.primaryDepartmentId === d.departmentId || p.secondaryDepartmentIds.includes(d.departmentId))
+        .filter((p) => personInDepartment(data, p.personId, d.departmentId))
         .map((p) => p.personId),
     )
     const validCertifications = data.certifications.filter(
       (c) => deptPeople.has(c.personId) && isCertValid(data, c),
     ).length
     const qualifyingEngagements = data.engagements.filter(
-      (e) => e.qualificationStatus.toLowerCase() === "qualified",
+      (e) => e.departmentId === d.departmentId && e.type !== "Non-Qualifying Engagement" && e.qualificationStatus.toLowerCase() === "qualified",
     ).length
 
     return {
@@ -351,3 +361,4 @@ export function departmentName(data: WorkbookData, id: string): string {
 export function personName(data: WorkbookData, id: string): string {
   return data.people.find((p) => p.personId === id)?.fullName ?? id ?? "—"
 }
+

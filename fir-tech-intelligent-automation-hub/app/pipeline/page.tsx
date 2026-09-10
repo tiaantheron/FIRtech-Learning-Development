@@ -1,4 +1,6 @@
-"use client"
+
+import { PipelineUSD } from "@/components/pipeline-usd"
+import { CurrencyDetails } from "@/components/currency-details"
 
 import { Target, TrendingUp, TrendingDown, CircleCheck } from "lucide-react"
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
@@ -9,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { DataTable, type Column } from "@/components/data-table"
 import { StatusBadge } from "@/components/status-badge"
 import { HBarChart } from "@/components/charts"
-import { departmentName, personName, pipelineMetrics, weightedValue } from "@/lib/calculations/metrics"
+import { departmentName, personName, pipelineMetrics, weightedValue, effectiveProbability } from "@/lib/calculations/metrics"
 import { formatCurrency, formatDate, formatPercent } from "@/lib/utils/format"
 import type { Lead, Opportunity } from "@/lib/models/types"
 
@@ -22,7 +24,7 @@ export default function PipelinePage() {
 
   const byDept = data.departments.map((d) => ({
     name: d.name,
-    value: data.opportunities.filter((o) => o.departmentId === d.departmentId).reduce((s, o) => s + weightedValue(o), 0),
+    value: pipelineMetrics(data, { ...filters, departmentId: d.departmentId }).weightedPipeline,
   }))
 
   const leadColumns: Column<Lead>[] = [
@@ -31,6 +33,7 @@ export default function PipelinePage() {
     { key: "departmentId", header: "Department", sortable: true, render: (l) => departmentName(data, l.departmentId) },
     { key: "estimatedValue", header: "Value", align: "right", sortable: true, render: (l) => formatCurrency(l.estimatedValue, l.currency) },
     { key: "source", header: "Source" },
+    { key: "conversion", header: "Reporting / FX", render: l => <CurrencyDetails record={l} amount={l.estimatedValue} /> },
     { key: "status", header: "Status", sortable: true, render: (l) => <StatusBadge status={l.status} /> },
     { key: "createdDate", header: "Created", align: "right", render: (l) => formatDate(l.createdDate) },
   ]
@@ -38,10 +41,11 @@ export default function PipelinePage() {
   const oppColumns: Column<Opportunity>[] = [
     { key: "name", header: "Opportunity", sortable: true, render: (o) => <span className="font-medium">{o.name}</span> },
     { key: "customer", header: "Customer", sortable: true },
+    { key: "conversion", header: "Reporting / FX", render: o => <CurrencyDetails record={o} amount={o.estimatedValue} /> },
     { key: "owner", header: "Owner", render: (o) => personName(data, o.owner) },
     { key: "departmentId", header: "Department", sortable: true, render: (o) => departmentName(data, o.departmentId) },
     { key: "estimatedValue", header: "Value", align: "right", sortable: true, render: (o) => formatCurrency(o.estimatedValue, o.currency) },
-    { key: "probability", header: "Prob.", align: "right", sortable: true, render: (o) => formatPercent(o.probability) },
+    { key: "probability", header: "Prob.", align: "right", sortable: true, sortValue: effectiveProbability, render: (o) => formatPercent(effectiveProbability(o)) },
     {
       key: "weighted",
       header: "Weighted",
@@ -72,7 +76,8 @@ export default function PipelinePage() {
       </section>
 
       <section className="space-y-3">
-        <SectionHeading title="Weighted Pipeline by Department" tone="resell" />
+        <PipelineUSD data={data} filters={filters} />
+        <SectionHeading title="Open Weighted Pipeline by Department (ZAR)" tone="resell" />
         <Card>
           <CardContent className="pt-5">
             <HBarChart data={byDept} color="var(--resell)" formatValue={(v) => `R${(v / 1_000_000).toFixed(1)}m`} />
@@ -92,3 +97,4 @@ export default function PipelinePage() {
     </div>
   )
 }
+

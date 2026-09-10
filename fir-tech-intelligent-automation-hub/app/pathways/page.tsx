@@ -1,6 +1,7 @@
-"use client"
+
 
 import { useWorkbookData } from "@/lib/workbook-context"
+import { GlobalFilters } from "@/components/global-filters"
 import { PageHeader, SectionHeading } from "@/components/page-header"
 import { PathwayCard } from "@/components/pathway-card"
 import { DataTable, type Column } from "@/components/data-table"
@@ -48,6 +49,7 @@ export default function PathwaysPage() {
     <div className="space-y-8">
       <PageHeader
         title="Partner Pathways"
+        actions={<GlobalFilters />}
         description="Requirements are loaded directly from the workbook and never hardcoded. Remaining = MAX(Required − Attained, 0). Supplied UiPath totals are preserved exactly."
       />
 
@@ -65,6 +67,7 @@ export default function PathwaysPage() {
           emptyMessage="No Resell requirements found in the workbook."
         />
       </section>
+      <section className="space-y-3"><SectionHeading title="Workbook Override Register" /><DataTable rows={data.overrides} columns={[{ key: "entityType", header: "Entity" }, { key: "entityId", header: "ID" }, { key: "field", header: "Field" }, { key: "value", header: "Override value" }, { key: "reason", header: "Reason" }]} searchKeys={o => `${o.entityId} ${o.reason}`} emptyMessage="No overrides supplied." /></section>
 
       <section className="space-y-3">
         <SectionHeading title="Services Requirements" tone="services" />
@@ -78,3 +81,4 @@ export default function PathwaysPage() {
     </div>
   )
 }
+

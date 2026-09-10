@@ -1,4 +1,4 @@
-"use client"
+
 
 import { useMemo, useState } from "react"
 import { FileDown, FileSpreadsheet } from "lucide-react"
@@ -10,16 +10,19 @@ import { Button } from "@/components/ui/button"
 import { DataTable, type Column } from "@/components/data-table"
 import { cn } from "@/lib/utils"
 import { REPORTS } from "@/lib/reports/reports"
+import { Select } from "@/components/ui/select"
 import { exportCSV, exportExcel, type ExportRow } from "@/lib/services/export"
 
 export default function ReportsPage() {
   const { filters } = useWorkbook()
-  const data = useWorkbookData()
+  const data = useWorkbookData(false)
+  const [employeeId, setEmployeeId] = useState("all")
   const [activeId, setActiveId] = useState(REPORTS[0].id)
 
   const active = REPORTS.find((r) => r.id === activeId) ?? REPORTS[0]
 
-  const rows: ExportRow[] = useMemo(() => (data ? active.build(data, filters) : []), [data, active, filters])
+  const supportsEmployee = ["training-outstanding", "certification", "pipeline"].includes(activeId)
+  const rows: ExportRow[] = useMemo(() => (data ? active.build(data, { ...filters, employeeId: supportsEmployee ? employeeId : "all" }) : []), [data, active, filters, employeeId, supportsEmployee])
 
   if (!data) return <p className="text-sm text-muted-foreground">No workbook data available.</p>
 
@@ -39,7 +42,7 @@ export default function ReportsPage() {
       <PageHeader
         title="Reports"
         description="Generate, filter and export executive reports. Exports respect the selected department and reporting period."
-        actions={<GlobalFilters />}
+        actions={<div className="flex flex-wrap gap-2"><GlobalFilters />{supportsEmployee && <Select aria-label="Employee filter" value={employeeId} onChange={e => setEmployeeId(e.target.value)}><option value="all">All employees</option>{data.people.map(p => <option key={p.personId} value={p.personId}>{p.fullName}</option>)}</Select>}</div>}
       />
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -88,3 +91,4 @@ export default function ReportsPage() {
     </div>
   )
 }
+

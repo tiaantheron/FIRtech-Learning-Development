@@ -1,11 +1,11 @@
-"use client"
+
 
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
 import { Select } from "@/components/ui/select"
 
 export function GlobalFilters() {
   const { filters, setFilters } = useWorkbook()
-  const data = useWorkbookData()
+  const data = useWorkbookData(false)
   if (!data) return null
 
   return (
@@ -45,3 +45,4 @@ export function GlobalFilters() {
     </div>
   )
 }
+

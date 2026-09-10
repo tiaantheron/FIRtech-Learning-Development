@@ -1,4 +1,5 @@
-"use client"
+
+import { RevenueHistory } from "@/components/revenue-history"
 
 import { Banknote, Target, TrendingUp, Info } from "lucide-react"
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
@@ -12,6 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { departmentName, revenueMetrics } from "@/lib/calculations/metrics"
 import { formatCurrency, formatPercent } from "@/lib/utils/format"
 import type { RevenueRecord } from "@/lib/models/types"
+import { reportingAmount } from "@/lib/calculations/currency"
+import { CurrencyDetails } from "@/components/currency-details"
 
 export default function RevenuePage() {
   const { filters } = useWorkbook()
@@ -22,8 +25,8 @@ export default function RevenuePage() {
 
   const deptRevenue = data.departments.map((d) => {
     const attained = data.revenue
-      .filter((r) => r.ownerDepartmentId === d.departmentId && r.currency === "ZAR")
-      .reduce((s, r) => s + r.amount, 0)
+      .filter((r) => r.ownerDepartmentId === d.departmentId)
+      .reduce((s, r) => s + (reportingAmount(r.amount, r) ?? 0), 0)
     return {
       departmentId: d.departmentId,
       name: d.name,
@@ -36,9 +39,14 @@ export default function RevenuePage() {
   const columns: Column<RevenueRecord>[] = [
     { key: "customer", header: "Customer", sortable: true, render: (r) => <span className="font-medium">{r.customer}</span> },
     { key: "type", header: "Type", sortable: true },
+    { key: "reportingCurrency", header: "Conversion details", render: r => <CurrencyDetails record={r} amount={r.amount} /> },
+    { key: "convertedAmount", header: "Reporting (ZAR)", render: r => reportingAmount(r.amount, r) === null ? "Not converted" : formatCurrency(reportingAmount(r.amount, r)!, "ZAR") },
+    { key: "exchangeRate", header: "FX rate" },
+    { key: "exchangeRateDate", header: "Rate date" },
+    { key: "exchangeRateSource", header: "Rate source" },
     {
       key: "amount",
-      header: "Amount",
+      header: "Original amount",
       align: "right",
       sortable: true,
       render: (r) => (
@@ -80,6 +88,7 @@ export default function RevenuePage() {
       </Card>
 
       <section className="space-y-3">
+        <RevenueHistory />
         <SectionHeading title="Department Revenue Targets (ZAR)" tone="resell" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {deptRevenue.map((d) => (
@@ -112,3 +121,4 @@ export default function RevenuePage() {
     </div>
   )
 }
+

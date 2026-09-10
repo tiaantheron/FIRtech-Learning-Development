@@ -19,3 +19,4 @@ export function StatusBadge({ status }: { status: string }) {
 
   return <Badge variant={variant}>{status || "—"}</Badge>
 }
+

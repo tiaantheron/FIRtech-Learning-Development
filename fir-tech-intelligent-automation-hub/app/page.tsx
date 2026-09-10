@@ -1,4 +1,6 @@
-"use client"
+
+import { PipelineUSD } from "@/components/pipeline-usd"
+import { RevenueHistory } from "@/components/revenue-history"
 
 import {
   Award,
@@ -118,7 +120,7 @@ export default function OverviewPage() {
               />
               <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                 <Stat label="Outstanding training" value={training.outstanding} />
-                <Stat label="Outstanding certs" value={certs.inProgress} />
+                <Stat label="Outstanding certs" value={certs.outstanding} />
                 <Stat label="Completed certs" value={certs.completed} />
                 <Stat label="Expiring (≤60d)" value={certs.expiring} />
               </dl>
@@ -170,6 +172,8 @@ export default function OverviewPage() {
       </section>
 
       {/* Risk */}
+      <PipelineUSD data={data} filters={filters} />
+      <RevenueHistory />
       <section className="space-y-3">
         <SectionHeading title="Risk" />
         <div className="grid gap-4 md:grid-cols-3">
@@ -195,3 +199,4 @@ function Stat({ label, value }: { label: string; value: string | number }) {
     </div>
   )
 }
+

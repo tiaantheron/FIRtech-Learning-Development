@@ -1,17 +1,66 @@
 import type { ValidationIssue, WorkbookData } from "@/lib/models/types"
-import { TRAINING_STATUSES, ENGAGEMENT_CATEGORIES } from "@/lib/models/types"
+import { TRAINING_STATUSES, CERT_STATUSES, REQUIREMENT_STATUSES, ENGAGEMENT_CATEGORIES } from "@/lib/models/types"
 
 // Cross-sheet business validation. Structural/column checks happen during parsing.
 export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const deptIds = new Set(data.departments.map((d) => d.departmentId))
   const personIds = new Set(data.people.map((p) => p.personId))
+  const issue = (worksheet: string, record: object, index: number, field: string, message: string, severity: "error" | "warning" = "error") => issues.push({ severity, worksheet, row: (record as { __rowNum__?: number }).__rowNum__ ?? index + 2, field, message })
+  for (const [sheet, rows] of [["Leads", data.leads], ["Opportunities", data.opportunities], ["Revenue", data.revenue], ["Engagements", data.engagements]] as const) {
+    rows.forEach((record, i) => {
+      if (!/^[A-Z]{3}$/.test(record.currency)) issue(sheet, record, i, "Currency", "Original currency must be a three-letter code, such as ZAR, USD or EUR.")
+      const hasConversion = record.exchangeRate !== undefined || record.convertedAmount !== undefined || !!record.exchangeRateDate || !!record.exchangeRateSource
+      if (hasConversion) {
+        if (!record.reportingCurrency || !/^[A-Z]{3}$/.test(record.reportingCurrency)) issue(sheet, record, i, "ReportingCurrency", "A conversion needs a three-letter reporting currency.")
+        if (!record.exchangeRate || record.exchangeRate <= 0) issue(sheet, record, i, "ExchangeRate", "A conversion needs a positive exchange rate (reporting units per original unit).")
+        if (!record.exchangeRateDate) issue(sheet, record, i, "ExchangeRateDate", "A conversion needs a rate date.")
+        if (!record.exchangeRateSource?.trim()) issue(sheet, record, i, "ExchangeRateSource", "A conversion needs a rate source.")
+        const amount = "amount" in record ? record.amount : "estimatedValue" in record ? record.estimatedValue : record.contractValue
+        if (record.convertedAmount !== undefined && record.exchangeRate && Math.abs(record.convertedAmount - Math.round(amount * record.exchangeRate * 100) / 100) > 0.011) issue(sheet, record, i, "ConvertedAmount", "Converted amount must equal original amount × exchange rate, rounded to cents.")
+        if (record.reportingCurrency === record.currency && record.exchangeRate !== 1) issue(sheet, record, i, "ExchangeRate", "Same-currency conversion must use a rate of 1.")
+      } else if (record.currency !== "ZAR") issue(sheet, record, i, "ExchangeRate", "No documented ZAR conversion. This transaction is retained in its original currency and excluded from ZAR totals.", "warning")
+      for (const [field, value] of Object.entries(record)) {
+        if (field.endsWith("DepartmentId") || field === "departmentId") {
+          if (value && !deptIds.has(String(value))) issue(sheet, record, i, field[0].toUpperCase() + field.slice(1), `Unknown department: ${value}`)
+        }
+        if (typeof value === "number" && value < 0) issue(sheet, record, i, field[0].toUpperCase() + field.slice(1), "Value must not be negative.")
+      }
+      if ("owner" in record && record.owner && !personIds.has(record.owner)) issue(sheet, record, i, "Owner", "Owner must reference a PersonId.")
+    })
+  }
+  data.certifications.forEach((c, i) => {
+    if (!CERT_STATUSES.includes(c.status)) issue("Certifications", c, i, "Status", `Unknown certification status: ${c.status}`)
+  })
+  data.reportingPeriods.forEach((p, i) => {
+    if (!p.startDate || !p.endDate || p.startDate > p.endDate) issue("ReportingPeriods", p, i, "EndDate", "A period needs valid start/end dates in chronological order.")
+  })
+  for (const [sheet, requirements] of [["ResellRequirements", data.resellRequirements], ["ServicesRequirements", data.servicesRequirements]] as const) {
+    requirements.forEach((r, i) => {
+      if (!REQUIREMENT_STATUSES.includes(r.status)) issue(sheet, r, i, "Status", "Status must be Achieved, Outstanding or Maintain.")
+      if (r.requiredValue < 0 || r.attainedValue < 0) issue(sheet, r, i, "AttainedValue", "Requirement values must be non-negative.")
+      if (r.status === "Achieved" && r.attainedValue < r.requiredValue && r.unit.toLowerCase() !== "boolean") issue(sheet, r, i, "Status", "Supplied achieved status differs from numerical attainment; supplied values are preserved.", "warning")
+    })
+  }
+  const overrideKeys = new Set<string>()
+  data.overrides.forEach((o, i) => {
+    const key = `${o.entityType}|${o.entityId}|${o.field}`
+    if (overrideKeys.has(key)) issue("Overrides", o, i, "Field", "Conflicting duplicate override.")
+    overrideKeys.add(key)
+    if (!o.reason) issue("Overrides", o, i, "Reason", "An override requires an audit reason.")
+    const rows = o.entityType === "Certification" ? data.certifications : o.entityType === "ResellRequirement" ? data.resellRequirements : o.entityType === "ServicesRequirement" ? data.servicesRequirements : null
+    if (!rows || !rows.some(r => ("certificationId" in r ? r.certificationId : r.requirementId) === o.entityId)) issue("Overrides", o, i, "EntityId", "Unknown override entity or entity type.")
+    const allowed = o.entityType === "Certification" ? ["status"] : ["status", "requiredValue", "attainedValue"]
+    if (!allowed.includes(o.field)) issue("Overrides", o, i, "Field", "Unsupported override field.")
+    if (o.field === "status" && !(o.entityType === "Certification" ? [...CERT_STATUSES] : [...REQUIREMENT_STATUSES]).includes(o.value as never)) issue("Overrides", o, i, "Value", "Invalid override status.")
+    if (o.field !== "status" && (!o.value.trim() || !Number.isFinite(Number(o.value)) || Number(o.value) < 0)) issue("Overrides", o, i, "Value", "Override value must be a non-negative number.")
+  })
 
   // People: referential integrity + duplicate detection by UiPath id / name
   const seenUiPath = new Map<string, string>()
   const seenName = new Map<string, string>()
   data.people.forEach((p, i) => {
-    const row = i + 2
+    const row = (p as typeof p & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (p.primaryDepartmentId && !deptIds.has(p.primaryDepartmentId)) {
       issues.push({
         severity: "error",
@@ -24,7 +73,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     p.secondaryDepartmentIds.forEach((d) => {
       if (d && !deptIds.has(d)) {
         issues.push({
-          severity: "warning",
+          severity: "error",
           worksheet: "People",
           row,
           field: "SecondaryDepartmentIds",
@@ -34,7 +83,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     })
     if (p.managerId && !personIds.has(p.managerId)) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "People",
         row,
         field: "ManagerId",
@@ -58,7 +107,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     if (nameKey) {
       if (seenName.has(nameKey)) {
         issues.push({
-          severity: "warning",
+          severity: "error",
           worksheet: "People",
           row,
           field: "FullName",
@@ -72,7 +121,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   // Memberships reference valid people + departments
   data.departmentMemberships.forEach((m, i) => {
-    const row = i + 2
+    const row = (m as typeof m & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (!personIds.has(m.personId)) {
       issues.push({
         severity: "error",
@@ -95,7 +144,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   // Training statuses valid + person exists
   data.trainingAssignments.forEach((t, i) => {
-    const row = i + 2
+    const row = (t as typeof t & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (!personIds.has(t.personId)) {
       issues.push({
         severity: "error",
@@ -107,7 +156,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     }
     if (!TRAINING_STATUSES.includes(t.status)) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "TrainingAssignments",
         row,
         field: "Status",
@@ -118,7 +167,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   // Certifications person exists + expiry sanity
   data.certifications.forEach((c, i) => {
-    const row = i + 2
+    const row = (c as typeof c & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (!personIds.has(c.personId)) {
       issues.push({
         severity: "error",
@@ -130,7 +179,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     }
     if (c.issueDate && c.expiryDate && c.expiryDate < c.issueDate) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "Certifications",
         row,
         field: "ExpiryDate",
@@ -141,7 +190,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   // Opportunities probability range + currency
   data.opportunities.forEach((o, i) => {
-    const row = i + 2
+    const row = (o as typeof o & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (o.probability < 0 || o.probability > 1) {
       issues.push({
         severity: "error",
@@ -153,7 +202,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     }
     if (!o.currency) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "Opportunities",
         row,
         field: "Currency",
@@ -165,7 +214,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   // Revenue: currency present + double-counting detection
   const revenueSeen = new Map<string, number>()
   data.revenue.forEach((r, i) => {
-    const row = i + 2
+    const row = (r as typeof r & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (!r.currency) {
       issues.push({
         severity: "error",
@@ -178,7 +227,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     const key = `${r.customer}|${r.amount}|${r.currency}|${r.recognizedDate ?? ""}`
     if (revenueSeen.has(key)) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "Revenue",
         row,
         field: "Amount",
@@ -204,10 +253,10 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   // Engagements: valid category + duplicate qualification detection
   const qualifiedSeen = new Set<string>()
   data.engagements.forEach((e, i) => {
-    const row = i + 2
+    const row = (e as typeof e & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (!ENGAGEMENT_CATEGORIES.includes(e.type)) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "Engagements",
         row,
         field: "Type",
@@ -215,10 +264,10 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
       })
     }
     if (e.qualificationStatus.toLowerCase() === "qualified") {
-      const key = `${e.customer.toLowerCase()}|${e.type}`
+      const key = `${e.customer.toLowerCase().trim()}|${e.type}|${e.type === "Unique Professional Services Engagement" ? "" : e.name.toLowerCase().trim()}`
       if (qualifiedSeen.has(key)) {
         issues.push({
-          severity: "warning",
+          severity: "error",
           worksheet: "Engagements",
           row,
           field: "QualificationStatus",
@@ -234,7 +283,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   ;[...data.resellRequirements, ...data.servicesRequirements].forEach((r) => {
     if (r.requiredValue > 0 && r.attainedValue < 0) {
       issues.push({
-        severity: "warning",
+        severity: "error",
         worksheet: "Requirements",
         row: null,
         field: "AttainedValue",
@@ -245,3 +294,5 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   return issues
 }
+
+

@@ -2,6 +2,7 @@ import * as XLSX from "xlsx"
 import { SHEET_DEFS, type ColumnDef, type SheetDef } from "@/lib/models/schema"
 import type { ParseResult, ValidationIssue, WorkbookData } from "@/lib/models/types"
 import { validateWorkbook } from "@/lib/validation/validate"
+import { adaptReferenceWorkbook } from "./reference-workbook"
 
 function excelDateToISO(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null
@@ -14,8 +15,10 @@ function excelDateToISO(value: unknown): string | null {
       return d.toISOString().slice(0, 10)
     }
   }
-  const asDate = new Date(String(value))
-  if (!Number.isNaN(asDate.getTime())) return asDate.toISOString().slice(0, 10)
+  const text = String(value).trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null
+  const asDate = new Date(text + "T00:00:00Z")
+  if (!Number.isNaN(asDate.getTime()) && asDate.toISOString().slice(0, 10) === text) return text
   return null
 }
 
@@ -27,6 +30,7 @@ function coerceValue(
   issues: ValidationIssue[],
 ): unknown {
   const empty = raw === null || raw === undefined || String(raw).trim() === ""
+  if (empty && col.key === "currency") return "ZAR"
 
   if (col.required && empty) {
     issues.push({
@@ -49,9 +53,9 @@ function coerceValue(
             .map((s) => s.trim())
             .filter(Boolean)
     case "number": {
-      if (empty) return 0
-      const n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.-]/g, ""))
-      if (Number.isNaN(n)) {
+      if (empty) return col.optional ? undefined : 0
+      const n = typeof raw === "number" ? raw : Number(String(raw).trim())
+      if (!Number.isFinite(n)) {
         issues.push({
           severity: "error",
           worksheet: sheet,
@@ -65,8 +69,8 @@ function coerceValue(
     }
     case "percent": {
       if (empty) return 0
-      let n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.-]/g, ""))
-      if (Number.isNaN(n)) {
+      let n = typeof raw === "number" ? raw : Number(String(raw).trim().replace(/%$/, ""))
+      if (!Number.isFinite(n)) {
         issues.push({
           severity: "error",
           worksheet: sheet,
@@ -77,10 +81,10 @@ function coerceValue(
         return 0
       }
       // Normalise to 0..1. Values above 1 are treated as whole percentages.
-      if (n > 1) n = n / 100
+      if (String(raw).trim().endsWith("%") || n > 1) n = n / 100
       if (n < 0 || n > 1) {
         issues.push({
-          severity: "warning",
+          severity: "error",
           worksheet: sheet,
           row: rowNumber,
           field: col.header,
@@ -92,6 +96,7 @@ function coerceValue(
     case "boolean": {
       if (empty) return false
       const s = String(raw).trim().toLowerCase()
+      if (!["true", "false", "yes", "no", "y", "n", "1", "0"].includes(s)) issues.push({ severity: "error", worksheet: sheet, row: rowNumber, field: col.header, message: `Invalid boolean: ${raw}` })
       return s === "true" || s === "yes" || s === "y" || s === "1"
     }
     case "date": {
@@ -99,7 +104,7 @@ function coerceValue(
       const iso = excelDateToISO(raw)
       if (!iso) {
         issues.push({
-          severity: "warning",
+          severity: "error",
           worksheet: sheet,
           row: rowNumber,
           field: col.header,
@@ -134,7 +139,7 @@ function parseSheet(
   const presentHeaders = new Set(rows.length > 0 ? Object.keys(rows[0]) : headerRow(ws))
 
   for (const col of def.columns) {
-    if (!presentHeaders.has(col.header)) {
+    if (!col.optional && !presentHeaders.has(col.header)) {
       issues.push({
         severity: "error",
         worksheet: def.sheet,
@@ -149,8 +154,9 @@ function parseSheet(
   const parsed: Record<string, unknown>[] = []
 
   rows.forEach((row, idx) => {
-    const rowNumber = idx + 2 // account for header row
+    const rowNumber = typeof row.__rowNum__ === "number" ? row.__rowNum__ + 1 : idx + 2
     const obj: Record<string, unknown> = {}
+    Object.defineProperty(obj, "__rowNum__", { value: rowNumber, enumerable: false })
     for (const col of def.columns) {
       const value = coerceValue(row[col.header], col, def.sheet, rowNumber, issues)
       obj[col.key] = value
@@ -190,9 +196,18 @@ function headerRow(ws: XLSX.WorkSheet): string[] {
 export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParseResult {
   const issues: ValidationIssue[] = []
   let data: WorkbookData | null = null
+  let remapIssue: ((issue: ValidationIssue) => ValidationIssue) | undefined
+  let referenceIssueCount = 0
 
   try {
-    const workbook = XLSX.read(buffer, { type: "array", cellDates: true })
+    let workbook = XLSX.read(buffer, { type: "array", cellDates: true })
+    if (workbook.Sheets.Settings && workbook.Sheets.Requirements && !workbook.Sheets.Overview) {
+      const adapted = adaptReferenceWorkbook(workbook)
+      workbook = adapted.workbook
+      issues.push(...adapted.issues)
+      referenceIssueCount = issues.length
+      remapIssue = adapted.remapIssue
+    }
 
     const raw = {
       overview: parseSheet(workbook, SHEET_DEFS.overview, issues),
@@ -229,8 +244,8 @@ export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParseResul
   }
 
   return {
-    data,
-    issues,
+    data: issues.some((issue) => issue.severity === "error") ? null : data,
+    issues: issues.map((issue, i) => remapIssue && i >= referenceIssueCount ? remapIssue(issue) : issue),
     loadedAt: new Date().toISOString(),
     fileName,
   }

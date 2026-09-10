@@ -1,4 +1,4 @@
-"use client"
+
 
 import {
   Bar,
@@ -45,7 +45,7 @@ export function DonutChart({
         </Pie>
         <Tooltip
           contentStyle={tooltipStyle}
-          formatter={(v: number, n: string) => [formatValue ? formatValue(v) : v, n]}
+          formatter={(v, n) => [formatValue ? formatValue(Number(v ?? 0)) : Number(v ?? 0), String(n)]}
         />
         <Legend
           verticalAlign="bottom"
@@ -81,7 +81,7 @@ export function HBarChart({
           axisLine={false}
           tickLine={false}
         />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => (formatValue ? formatValue(v) : v)} cursor={{ fill: "var(--muted)" }} />
+        <Tooltip contentStyle={tooltipStyle} formatter={(v) => (formatValue ? formatValue(Number(v ?? 0)) : Number(v ?? 0))} cursor={{ fill: "var(--muted)" }} />
         <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} barSize={18} />
       </BarChart>
     </ResponsiveContainer>
@@ -105,7 +105,7 @@ export function GroupedBarChart({
         <CartesianGrid vertical={false} stroke={GRID} />
         <XAxis dataKey="name" tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fill: AXIS, fontSize: 11 }} tickFormatter={formatValue} axisLine={false} tickLine={false} width={70} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => (formatValue ? formatValue(v) : v)} cursor={{ fill: "var(--muted)" }} />
+        <Tooltip contentStyle={tooltipStyle} formatter={(v) => (formatValue ? formatValue(Number(v ?? 0)) : Number(v ?? 0))} cursor={{ fill: "var(--muted)" }} />
         <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} />
         {series.map((s) => (
           <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[4, 4, 0, 0]} barSize={22} />
@@ -132,7 +132,7 @@ export function TrendChart({
         <CartesianGrid vertical={false} stroke={GRID} />
         <XAxis dataKey="name" tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fill: AXIS, fontSize: 11 }} tickFormatter={formatValue} axisLine={false} tickLine={false} width={70} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => (formatValue ? formatValue(v) : v)} />
+        <Tooltip contentStyle={tooltipStyle} formatter={(v) => (formatValue ? formatValue(Number(v ?? 0)) : Number(v ?? 0))} />
         <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} />
         {series.map((s) => (
           <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={s.color} strokeWidth={2} dot={false} />
@@ -141,3 +141,5 @@ export function TrendChart({
     </ResponsiveContainer>
   )
 }
+
+

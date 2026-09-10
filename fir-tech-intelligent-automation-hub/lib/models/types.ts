@@ -20,6 +20,7 @@ export const TRAINING_STATUSES = [
 export type TrainingStatus = (typeof TRAINING_STATUSES)[number]
 
 export const CERT_STATUSES = [
+  ...TRAINING_STATUSES,
   "Not Started",
   "In Progress",
   "Scheduled",
@@ -42,7 +43,15 @@ export const ENGAGEMENT_CATEGORIES = [
 ] as const
 export type EngagementCategory = (typeof ENGAGEMENT_CATEGORIES)[number]
 
-export type Currency = "USD" | "ZAR"
+export type Currency = string
+
+export interface CurrencyConversion {
+  reportingCurrency?: string
+  convertedAmount?: number
+  exchangeRate?: number
+  exchangeRateDate?: string | null
+  exchangeRateSource?: string
+}
 
 export interface OverviewSetting {
   key: string
@@ -89,6 +98,7 @@ export interface TrainingAssignment {
 }
 
 export interface Certification {
+  dueDate?: string | null
   certificationId: string
   personId: string
   certName: string
@@ -98,7 +108,7 @@ export interface Certification {
   uiPathCertCode: string
 }
 
-export interface Lead {
+export interface Lead extends CurrencyConversion {
   leadId: string
   customer: string
   owner: string
@@ -110,7 +120,7 @@ export interface Lead {
   createdDate: string | null
 }
 
-export interface Opportunity {
+export interface Opportunity extends CurrencyConversion {
   opportunityId: string
   customer: string
   name: string
@@ -123,7 +133,7 @@ export interface Opportunity {
   closeDate: string | null
 }
 
-export interface RevenueRecord {
+export interface RevenueRecord extends CurrencyConversion {
   revenueId: string
   customer: string
   amount: number
@@ -136,7 +146,9 @@ export interface RevenueRecord {
   type: string
 }
 
-export interface Engagement {
+export interface Engagement extends CurrencyConversion {
+  departmentId?: string
+  owner?: string
   engagementId: string
   customer: string
   name: string
@@ -150,6 +162,7 @@ export interface Engagement {
 }
 
 export interface Requirement {
+  departmentId?: string
   requirementId: string
   requirement: string
   requiredValue: number

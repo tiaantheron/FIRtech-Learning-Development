@@ -1,6 +1,7 @@
-"use client"
+
 
 import { useWorkbookData } from "@/lib/workbook-context"
+import { GlobalFilters } from "@/components/global-filters"
 import { PageHeader, SectionHeading } from "@/components/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -54,6 +55,7 @@ export default function DepartmentsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Departments"
+        actions={<GlobalFilters />}
         description="Ownership of revenue, pipeline and certification targets across FIRtech departments."
       />
 
@@ -109,3 +111,4 @@ function Row({ label, value }: { label: string; value: string | number }) {
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-"use client"
+
 
 import { useMemo, useState } from "react"
 import { CircleCheck, CircleAlert, TriangleAlert } from "lucide-react"
@@ -62,7 +62,7 @@ export default function ValidationPage() {
         <KpiCard label="Warnings" value={warnings} icon={TriangleAlert} tone={warnings > 0 ? "warning" : "success"} />
         <KpiCard
           label="Status"
-          value={errors === 0 ? "Valid" : "Invalid"}
+          value={!result ? "Not loaded" : errors === 0 ? "Valid" : "Invalid"}
           icon={CircleCheck}
           tone={errors === 0 ? "success" : "danger"}
           sublabel={result ? `Validated ${new Date(result.loadedAt).toLocaleString()}` : undefined}
@@ -72,7 +72,7 @@ export default function ValidationPage() {
       {issues.length === 0 ? (
         <div className="flex items-center gap-3 rounded-lg border border-[var(--success)]/30 bg-[var(--success)]/10 p-4 text-sm">
           <CircleCheck className="h-5 w-5 text-[var(--success)]" />
-          <p>All validation checks passed. The workbook structure and data are consistent.</p>
+          <p>{result ? "All validation checks passed. The workbook structure and data are consistent." : "Upload a workbook to validate its structure and data."}</p>
         </div>
       ) : (
         <>
@@ -103,3 +103,4 @@ export default function ValidationPage() {
     </div>
   )
 }
+

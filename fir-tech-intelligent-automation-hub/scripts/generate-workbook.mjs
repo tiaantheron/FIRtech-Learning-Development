@@ -95,11 +95,11 @@ add("Revenue", [
 ])
 
 add("Engagements", [
-  { EngagementId: "E-01", Customer: "Sasol", Name: "Finance Automation", Type: "Resell Customer Engagement", QualificationStatus: "Qualified", ContractValue: 4100000, Currency: "ZAR", NPSStatus: "Submitted", CSATStatus: "Submitted", Date: "2025-09-05" },
-  { EngagementId: "E-02", Customer: "Standard Bank", Name: "KYC Delivery", Type: "Unique Professional Services Engagement", QualificationStatus: "Qualified", ContractValue: 6100000, Currency: "ZAR", NPSStatus: "Submitted", CSATStatus: "Pending", Date: "2025-09-25" },
-  { EngagementId: "E-03", Customer: "Telkom", Name: "Ops Automation", Type: "Professional Services Engagement", QualificationStatus: "Qualified", ContractValue: 2750000, Currency: "ZAR", NPSStatus: "Pending", CSATStatus: "Submitted", Date: "2025-07-15" },
-  { EngagementId: "E-04", Customer: "Absa", Name: "POC", Type: "Non-Qualifying Engagement", QualificationStatus: "Not Qualified", ContractValue: 0, Currency: "ZAR", NPSStatus: "N/A", CSATStatus: "N/A", Date: "2025-06-20" },
-  { EngagementId: "E-05", Customer: "Old Mutual", Name: "Policy Servicing", Type: "Professional Services Engagement", QualificationStatus: "In Progress", ContractValue: 3900000, Currency: "ZAR", NPSStatus: "Pending", CSATStatus: "Pending", Date: "2025-10-01" },
+  { EngagementId: "E-01", DepartmentId: "DEP-PRESALES", Owner: "P-003", Customer: "Sasol", Name: "Finance Automation", Type: "Resell Customer Engagement", QualificationStatus: "Qualified", ContractValue: 4100000, Currency: "ZAR", NPSStatus: "Submitted", CSATStatus: "Submitted", Date: "2025-09-05" },
+  { EngagementId: "E-02", DepartmentId: "DEP-DELIVERY", Owner: "P-004", Customer: "Standard Bank", Name: "KYC Delivery", Type: "Unique Professional Services Engagement", QualificationStatus: "Qualified", ContractValue: 6100000, Currency: "ZAR", NPSStatus: "Submitted", CSATStatus: "Pending", Date: "2025-09-25" },
+  { EngagementId: "E-03", DepartmentId: "DEP-PS", Owner: "P-002", Customer: "Telkom", Name: "Ops Automation", Type: "Professional Services Engagement", QualificationStatus: "Qualified", ContractValue: 2750000, Currency: "ZAR", NPSStatus: "Pending", CSATStatus: "Submitted", Date: "2025-07-15" },
+  { EngagementId: "E-04", DepartmentId: "DEP-SALES", Owner: "P-001", Customer: "Absa", Name: "POC", Type: "Non-Qualifying Engagement", QualificationStatus: "Not Qualified", ContractValue: 0, Currency: "ZAR", NPSStatus: "N/A", CSATStatus: "N/A", Date: "2025-06-20" },
+  { EngagementId: "E-05", DepartmentId: "DEP-PS", Owner: "P-002", Customer: "Old Mutual", Name: "Policy Servicing", Type: "Professional Services Engagement", QualificationStatus: "In Progress", ContractValue: 3900000, Currency: "ZAR", NPSStatus: "Pending", CSATStatus: "Pending", Date: "2025-10-01" },
 ])
 
 add("ResellRequirements", [
@@ -131,5 +131,6 @@ add("ReportingPeriods", [
 
 mkdirSync("public", { recursive: true })
 const out = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
-writeFileSync("public/sample-workbook.xlsx", out)
-console.log("Wrote public/sample-workbook.xlsx")
+writeFileSync(process.argv[2] ?? "public/sample-workbook.xlsx", out)
+console.log("Wrote test/demo workbook")
+

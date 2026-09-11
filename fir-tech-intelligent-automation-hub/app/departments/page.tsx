@@ -82,7 +82,7 @@ export default function DepartmentsPage() {
       </section>
 
       <section className="space-y-3">
-        <SectionHeading title="Revenue: Target vs Attained (ZAR)" tone="resell" />
+        <SectionHeading title="Revenueishdbgababababababababababababababababababbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Target vs Attained (ZAR)" tone="resell" />
         <Card>
           <CardContent className="pt-5">
             <GroupedBarChart

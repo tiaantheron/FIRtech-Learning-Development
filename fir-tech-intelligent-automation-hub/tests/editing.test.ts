@@ -36,12 +36,20 @@ test("add and remove records round-trip through Excel with no phantom blank reco
   assert.equal(readEditorSheet(removed, "Opportunities").rows.length, 4)
   assert.equal(parseWorkbook(removed, "roundtrip.xlsx").data?.opportunities.length, 4)
 })
-test("renaming an employee updates linked names, while deleting a referenced employee is blocked", async () => {
+test("renaming follows references and archiving retains a linked employee and their history", async () => {
   const row = readEditorSheet(source, "People").rows.find(r => r.values.FullName === "Sanveer")!
   const output = await mutateWorkbook(source, "People", row.row, { ...row.values, FullName: "Sanveer Updated" }, "save")
   assert.ok(readEditorSheet(output, "Memberships").rows.some(r => r.values.Person === "Sanveer Updated"))
   assert.ok(readEditorSheet(output, "Opportunities").rows.some(r => r.values.Owner === "Sanveer Updated"))
-  await assert.rejects(mutateWorkbook(source, "People", row.row, row.values, "delete"), /unknown person|Owner must reference/i)
+  const archived = await mutateWorkbook(source, "People", row.row, row.values, "delete")
+  const data = parseWorkbook(archived, "archived.xlsx").data!
+  assert.equal(data.people.find(p => p.fullName === "Sanveer")?.employmentStatus, "Archived")
+  assert.equal(data.people.length, 11); assert.equal(data.departmentMemberships.length, 5)
+  const assignment = readEditorSheet(archived, "Training").rows[0]
+  await assert.rejects(mutateWorkbook(archived, "Training", null, { ...assignment.values, AssignmentID: "TRN-NEW", Person: "Sanveer" }, "save"), /Archived people/)
+  const restored = await mutateWorkbook(archived, "People", row.row, { ...row.values, EmploymentStatus: "Active" }, "save")
+  assert.equal(parseWorkbook(restored, "restored.xlsx").data!.people.find(p => p.fullName === "Sanveer")!.employmentStatus, "Active")
+  assert.equal(readEditorSheet(restored, "Audit").rows.at(-1)!.values.Action, "Restore")
 })
 test("creating detailed revenue records extends reference workbook and updates ZAR totals", async () => {
   const output = await mutateWorkbook(source, "Revenue", null, { RevenueId: "REV-NEW", Customer: "Customer", Amount: 100, Currency: "EUR", OwnerDepartmentId: "DEP-001", RecognizedDate: "2026-09-10", Type: "Services", ReportingCurrency: "ZAR", ExchangeRate: 20, ExchangeRateDate: "2026-09-10", ExchangeRateSource: "Approved invoice rate" }, "save")

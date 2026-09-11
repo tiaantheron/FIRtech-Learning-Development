@@ -19,6 +19,7 @@ import {
 import { daysUntil } from "@/lib/utils/format"
 import { filterWorkbook } from "@/lib/calculations/filter"
 import { conversionReport } from "@/lib/calculations/currency"
+import { additionalReports } from "./additional-reports"
 
 export interface ReportDef {
   id: string
@@ -52,13 +53,13 @@ const definitions: ReportDef[] = [
     id: "resell-gap",
     name: "Resell Gap Report",
     description: "Outstanding Resell requirements and remaining values.",
-    build: (data) => requirementRows(data.resellRequirements),
+    build: (data) => requirementRows(data.resellRequirements.filter(r => r.status === "Outstanding")),
   },
   {
     id: "services-gap",
     name: "Services Gap Report",
     description: "Outstanding Services requirements and remaining values.",
-    build: (data) => requirementRows(data.servicesRequirements),
+    build: (data) => requirementRows(data.servicesRequirements.filter(r => r.status === "Outstanding")),
   },
   {
     id: "department-performance",
@@ -123,7 +124,7 @@ const definitions: ReportDef[] = [
         Currency: currency,
         "Probability %": "",
         Weighted: Math.round(pipe.weightedPipeline),
-        Stage: `Conversion ${pct(pipe.conversionRate)}`,
+        Stage: `Closed opportunity win rate ${pct(pipe.conversionRate)}`,
         Close: "",
       }) }
       return rows
@@ -185,7 +186,7 @@ const definitions: ReportDef[] = [
   },
 ]
 
-export const REPORTS: ReportDef[] = definitions.map(report => ({ ...report, build: (data, filters) => report.build(filterWorkbook(data, filters), filters) }))
+export const REPORTS: ReportDef[] = [...definitions, ...additionalReports(definitions)].map(report => ({ ...report, build: (data, filters) => report.build(filterWorkbook(data, filters), filters) }))
 
 function requirementRows(reqs: WorkbookData["resellRequirements"]): ExportRow[] {
   return reqs.map((r) => ({
@@ -211,4 +212,5 @@ function pct(v: number): string {
 function money(v: number, currency = "ZAR"): string {
   return `${currency} ${Math.round(v || 0).toLocaleString()}`
 }
+
 

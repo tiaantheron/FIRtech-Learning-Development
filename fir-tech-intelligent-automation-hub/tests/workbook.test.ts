@@ -9,7 +9,7 @@ import { parseWorkbook } from "../lib/services/parse"
 import { filterWorkbook, applyOverrides } from "../lib/calculations/filter"
 import { certMetrics, isCertValid, pipelineMetrics, revenueMetrics, weightedValue, remainingValue, departmentPerformance } from "../lib/calculations/metrics"
 import { REPORTS } from "../lib/reports/reports"
-import { exportSourceWorkbook } from "../lib/services/export"
+
 
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "firtech-test-"))
 const fixturePath = join(fixtureDirectory, "fixture.xlsx")
@@ -127,21 +127,4 @@ test("reference missing columns are errors and the default currency is ZAR", () 
   // Required Course header is column E in this reference.
   delete wb.Sheets.Training.E1
   assert.equal(parse(XLSX.write(wb, { type: "buffer", bookType: "xlsx" })).data, null)
-})
-
-test("Excel source export preserves the exact reference bytes and filename", async () => {
-  const bytes = readFileSync("public/firtech_dashboard.xlsx")
-  const file = new File([bytes], "firtech_dashboard.xlsx")
-  const anchor = { href: "", download: "", click() {} }
-  const previous = Object.getOwnPropertyDescriptor(globalThis, "document")
-  Object.defineProperty(globalThis, "document", { configurable: true, value: { createElement: () => anchor, body: { appendChild() {}, removeChild() {} } } })
-  try {
-    exportSourceWorkbook(file)
-    assert.equal(anchor.download, "firtech_dashboard-export.xlsx")
-    const exported = await fetch(anchor.href).then(response => response.arrayBuffer())
-    assert.deepEqual(Buffer.from(exported), bytes)
-  } finally {
-    if (previous) Object.defineProperty(globalThis, "document", previous)
-    else Reflect.deleteProperty(globalThis, "document")
-  }
 })

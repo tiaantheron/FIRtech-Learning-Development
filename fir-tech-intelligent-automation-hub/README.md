@@ -15,11 +15,13 @@ Open the local address printed by Vite. `pnpm build` type-checks and builds the 
 
 ## Workbook workflow
 
-The application starts with an **Open your Excel workbook** prompt. Click **Choose Excel file** to browse any folder or accessible drive. No workbook is loaded automatically. The **Download reference workbook** link provides `public/firtech_dashboard.xlsx`, the supplied nine-sheet layout. Its Settings sheet identifies its data as mock/draft.
+Click **Choose Excel file** to browse any folder or accessible drive. Where the browser exposes the File System Access API, allow read/write access: each applied edit, addition, removal or undo automatically saves to that same source file. Intermediate form typing is not saved. Invalid changes are rejected; allocation changes remain pending until active allocations total 100%. The app serializes writes and indicates pending changes or save failures. File locks, revoked access and changed source bytes stop saving without intentionally overwriting the newer file. Close Excel if it holds a lock, then use **Save Excel** to retry. This byte comparison is not an atomic multi-user lock.
 
-Use **Replace workbook** to select another `.xlsx` file. All parsing happens in your browser. **Refresh** revalidates the currently edited workbook; to pick up edits saved externally, select the updated workbook again. Reloading the browser returns to the file-selection prompt. Use **Save Excel** to choose a destination and write the revised workbook. In browsers without the file-save API, this downloads an updated Excel file instead.
+The browser remembers the file handle in IndexedDB, without storing workbook contents or a raw path. On the next visit, **Reconnect workbook** requests access and reads the current source. Access is specific to this browser profile and application origin; moving the file, clearing browser data or changing the local server address can require selection again. **Forget file** removes the remembered connection and switches the current workbook to download mode. Business data stays in memory until written to Excel.
 
-**Save Excel** writes the current workbook, including edits, additions, removals and appended audit entries. ExcelJS retains the reference workbook sheet layout and cell styles. This export is unfiltered; Reports provides separate filtered CSV/Excel tables. Save to the original path to replace it, or choose a new filename. The next save reuses that selected destination. Cancelling the picker keeps edits unsaved.
+Where direct access is unavailable, the ordinary file picker reads the workbook and **Download Excel** exports an updated copy. This mode cannot update the original file automatically. **Refresh** rereads a connected source (asking before discarding pending changes), or revalidates the in-memory workbook in download mode. To preserve pending edits during an external conflict, forget the connection and download a separate copy before reopening the external version.
+
+ExcelJS retains the reference sheet layout and cell styles. The full workbook, including appended audit entries, is saved independently of dashboard filters. Reports exports filtered CSV/Excel tables separately. The **Download reference workbook** link provides the supplied nine-sheet `public/firtech_dashboard.xlsx`; it is only modified if explicitly chosen as the connected source.
 
 The reference-format importer supports Settings, Departments, People, Memberships, Requirements, Training, Opportunities, Engagements and Audit. It resolves name-based memberships and splits the combined Requirements sheet into dashboard pathways without changing supplied attained totals. At risk maps to outstanding readiness; the original label remains intact in the exported workbook. Reference Overdue assignments map to In Progress; overdue calculations use their due dates. Notes marked Maintain preserve that requirement status.
 
@@ -67,7 +69,7 @@ Overrides are applied in memory without modifying raw workbook values. No implic
 
 ## Code layout
 
-`app/` contains the ten page modules; `components/` contains reusable controls/charts; `lib/models/` defines data; `lib/services/` parses and exports; `lib/validation/` validates; `lib/calculations/` owns business calculations and shared filters; `lib/reports/` defines nine reports; `lib/workbook-context.tsx` provides React Context and hooks. React Router is configured in `main.tsx`.
+`app/` contains lazily loaded page modules; `components/` contains reusable controls/charts; `lib/models/` defines data; `lib/services/` parses and exports; `lib/validation/` validates; `lib/calculations/` owns business calculations and shared filters; `lib/reports/` defines the report catalogue; `lib/workbook-context.tsx` provides React Context and hooks. React Router is configured in `main.tsx`.
 
 No public hosting was configured. For any future static hosting, route unknown paths to `index.html` for React Router.
 
@@ -75,6 +77,20 @@ No public hosting was configured. For any future static hosting, route unknown p
 
 Each section includes **Edit / add / remove**. Choose the source sheet, search for a record, and use Edit or Remove; use Add entry for a new record. The editor shows all source records independently of dashboard filters. Calculated KPI cards update from their underlying records. ConvertedAmount, Remaining and WeightedValue are recalculated; arbitrary Excel formula cells are protected from direct editing and Excel recalculates formulas when opening the exported file.
 
-**Apply to workbook** validates the complete candidate workbook before replacing the in-memory version. Invalid changes show worksheet/row/field errors and do not change the source. Deleting linked people/departments is rejected. Reference-format person and department name edits update their name-based references automatically. Department allocation totals can temporarily differ from 100% while redistributing allocations, with a warning. Undo restores the previous complete workbook snapshot, including its audit state. Unsaved edits are indicated and closing/replacing the workbook prompts before discarding them.
+**Apply to workbook** validates the complete candidate workbook before replacing the in-memory version. Invalid changes show worksheet/row/field errors and do not change the source. Removing people/departments archives them instead of clearing their rows; Restore is available in the editor. Archived people cannot receive new assignments, and archived departments must be restored before assigning new targets. Reference-format person and department name edits update their name-based references automatically. Department allocation totals can temporarily differ from 100% while redistributing allocations, with a warning. Save Excel refuses to write until active allocations total 100%. Undo retains up to 20 complete workbook snapshots and restores the previous snapshot, including its audit state; connected sources save that undo automatically. Unsaved edits are indicated and closing/replacing the workbook prompts before discarding them.
 
-Changes are in browser memory until **Save Excel** succeeds. The reference file in public is never modified automatically; choose it as the destination if you want to replace it. The Audit sheet, when present, records additions, updates and deletions as Dashboard user. No authentication or database was introduced.
+Applied changes automatically save when a source is connected; otherwise download the updated file. Pending changes remain in browser memory until a save succeeds. An Audit sheet is created when missing and records edits as Dashboard user. Audit History is read-only in the application and can be exported. This does not provide authenticated, tamper-resistant auditing. No authentication or database was introduced.
+
+
+## Original specification review
+
+See SPEC-REVIEW.md for the requirement-by-requirement assessment, quick fixes implemented, and production-scope decisions that remain. Reports and audit history support printing; data tables paginate and expand matching rows for printing. Native Excel saving checks the destination bytes against the loaded/last-saved copy and stops on conflicts; this is not an atomic multi-user lock.
+
+
+## Personalization
+
+The bottom-left **Personalize** control offers FIRtech Blue, Indigo Slate and Forest Teal. Restrained gradients style the sidebar, background and cards. The preference is kept locally; it does not change the workbook. The supplied FIRtech logo appears in the sidebar.
+
+## Verification scope
+
+The regression suite covers workbook parsing, calculations, record lifecycle, styles, exports/report selection and source-write success/conflicts/permission and disk failures. Browser file-picker permissions and remembered-handle recovery still need a manual check in the target browser. No backend, multi-user locking or authenticated audit was added.

@@ -261,7 +261,7 @@ export function engagementMetrics(data: WorkbookData, filters = EMPTY_FILTERS): 
   for (const e of items) {
     if (e.type === "Resell Customer Engagement") customer++
     if (e.type === "Professional Services Engagement" || e.type === "Unique Professional Services Engagement") ps++
-    if (e.type === "Unique Professional Services Engagement" && e.qualificationStatus.toLowerCase() === "qualified") uniqueCustomers.add(e.customer.toLowerCase().trim())
+    if ((e.type === "Unique Professional Services Engagement" || (e.type === "Professional Services Engagement" && e.uniqueCustomer)) && e.qualificationStatus.toLowerCase() === "qualified") uniqueCustomers.add(e.customer.toLowerCase().trim())
     if (e.type === "Non-Qualifying Engagement") nonQualifying++
     else if (e.qualificationStatus.toLowerCase() === "qualified") qualifying++
   }

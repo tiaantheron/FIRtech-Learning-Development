@@ -13,11 +13,6 @@ export function download(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export function exportSourceWorkbook(file: File) {
-  // Download original bytes: SheetJS reserialization would lose template styling.
-  download(file, file.name.replace(/\.xlsx$/i, "-export.xlsx"))
-}
-
 export function exportCSV(rows: ExportRow[], fileName: string) {
   if (rows.length === 0) return
   const headers = Object.keys(rows[0])

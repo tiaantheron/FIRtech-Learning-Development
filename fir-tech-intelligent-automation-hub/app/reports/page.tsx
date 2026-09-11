@@ -1,7 +1,7 @@
 
 
 import { useMemo, useState } from "react"
-import { FileDown, FileSpreadsheet } from "lucide-react"
+import { FileDown, FileSpreadsheet, Printer } from "lucide-react"
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
 import { PageHeader } from "@/components/page-header"
 import { GlobalFilters } from "@/components/global-filters"
@@ -21,7 +21,7 @@ export default function ReportsPage() {
 
   const active = REPORTS.find((r) => r.id === activeId) ?? REPORTS[0]
 
-  const supportsEmployee = ["training-outstanding", "certification", "pipeline"].includes(activeId)
+  const supportsEmployee = ["training-outstanding", "certification", "pipeline", "certifications-outstanding", "certifications-completed", "certifications-expiring", "assignments-overdue", "pipeline-owner"].includes(activeId)
   const rows: ExportRow[] = useMemo(() => (data ? active.build(data, { ...filters, employeeId: supportsEmployee ? employeeId : "all" }) : []), [data, active, filters, employeeId, supportsEmployee])
 
   if (!data) return <p className="text-sm text-muted-foreground">No workbook data available.</p>
@@ -44,9 +44,10 @@ export default function ReportsPage() {
         description="Generate, filter and export executive reports. Exports respect the selected department and reporting period."
         actions={<div className="flex flex-wrap gap-2"><GlobalFilters />{supportsEmployee && <Select aria-label="Employee filter" value={employeeId} onChange={e => setEmployeeId(e.target.value)}><option value="all">All employees</option>{data.people.map(p => <option key={p.personId} value={p.personId}>{p.fullName}</option>)}</Select>}</div>}
       />
+      <p className="text-sm text-muted-foreground">Period: {data.reportingPeriods.find(p => p.periodId === filters.periodId)?.name ?? "All periods"} · Department: {data.departments.find(d => d.departmentId === filters.departmentId)?.name ?? "All departments"}{supportsEmployee && ` · Person: ${data.people.find(p => p.personId === employeeId)?.fullName ?? "All people"}`}</p>
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <nav className="space-y-1">
+        <nav className="space-y-1 print:hidden">
           {REPORTS.map((r) => (
             <button
               key={r.id}
@@ -70,6 +71,7 @@ export default function ReportsPage() {
                 <p className="text-sm text-muted-foreground">{active.description}</p>
               </div>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
                 <Button variant="outline" size="sm" onClick={() => exportCSV(rows, fileBase)} disabled={rows.length === 0}>
                   <FileDown className="h-4 w-4" /> CSV
                 </Button>

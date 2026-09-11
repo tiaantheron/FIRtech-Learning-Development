@@ -1,6 +1,7 @@
 
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { flushSync } from "react-dom"
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,15 @@ export function DataTable<T>({
   const [query, setQuery] = useState("")
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [printing, setPrinting] = useState(false)
+  useEffect(() => {
+    const before = () => flushSync(() => setPrinting(true))
+    const after = () => setPrinting(false)
+    window.addEventListener("beforeprint", before); window.addEventListener("afterprint", after)
+    return () => { window.removeEventListener("beforeprint", before); window.removeEventListener("afterprint", after) }
+  }, [])
 
   const filtered = useMemo(() => {
     let out = rows
@@ -53,6 +63,7 @@ export function DataTable<T>({
   }, [rows, query, sortKey, sortDir, columns, searchKeys])
 
   const toggleSort = (key: string) => {
+    setPage(1)
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"))
     else {
       setSortKey(key)
@@ -60,14 +71,17 @@ export function DataTable<T>({
     }
   }
 
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pages)
+  const start = (currentPage - 1) * pageSize
   return (
     <div className="flex flex-col gap-3">
       {searchable && searchKeys ? (
-        <div className="relative max-w-xs">
+        <div className="relative max-w-xs print:hidden">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setPage(1) }}
             placeholder="Search..."
             className="pl-8"
             aria-label="Search table"
@@ -81,6 +95,8 @@ export function DataTable<T>({
               {columns.map((c) => (
                 <th
                   key={c.key}
+                  scope="col"
+                  aria-sort={sortKey === c.key ? sortDir === "asc" ? "ascending" : "descending" : undefined}
                   className={cn(
                     "px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
                     c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left",
@@ -121,7 +137,7 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              filtered.map((row, i) => (
+              (printing ? filtered : filtered.slice(start, start + pageSize)).map((row, i) => (
                 <tr key={i} className="border-b border-border/60 last:border-0 hover:bg-muted/40">
                   {columns.map((c) => (
                     <td
@@ -140,7 +156,7 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">{filtered.length} records</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm print:hidden"><span>{filtered.length ? start + 1 : 0}–{Math.min(start + pageSize, filtered.length)} of {filtered.length} records</span><div className="flex items-center gap-3"><label>Rows <select aria-label="Rows per page" className="rounded border bg-background p-1" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}>{[25, 50, 100].map(n => <option key={n}>{n}</option>)}</select></label><button className="rounded border px-2 py-1 disabled:opacity-40" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button><span>Page {currentPage} of {pages}</span><button className="rounded border px-2 py-1 disabled:opacity-40" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>Next</button></div></div>
     </div>
   )
 }

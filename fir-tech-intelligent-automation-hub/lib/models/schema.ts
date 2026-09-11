@@ -32,6 +32,7 @@ export const SHEET_DEFS: Record<string, SheetDef> = {
     sheet: "Departments",
     columns: [
       { key: "departmentId", header: "DepartmentId", type: "string", required: true, unique: true },
+      { key: "status", header: "Status", type: "string", optional: true },
       { key: "name", header: "Name", type: "string", required: true },
       { key: "head", header: "Head", type: "string" },
       { key: "revenueAllocationPct", header: "RevenueAllocationPct", type: "percent" },
@@ -144,6 +145,7 @@ export const SHEET_DEFS: Record<string, SheetDef> = {
     sheet: "Engagements",
     columns: [
       { key: "engagementId", header: "EngagementId", type: "string", required: true, unique: true },
+      { key: "uniqueCustomer", header: "UniqueCustomer", type: "boolean", optional: true },
       { key: "departmentId", header: "DepartmentId", type: "string", optional: true },
       { key: "owner", header: "Owner", type: "string", optional: true },
       { key: "customer", header: "Customer", type: "string", required: true },

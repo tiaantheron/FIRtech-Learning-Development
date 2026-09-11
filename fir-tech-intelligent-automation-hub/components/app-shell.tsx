@@ -26,6 +26,8 @@ import { useWorkbook } from "@/lib/workbook-context"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils/format"
 import { WorkbookEditor } from "./workbook-editor"
+import { Personalization } from "./personalization"
+import { sourcePicker } from "@/lib/services/file-connection"
 
 interface NavItem {
   href: string
@@ -43,12 +45,13 @@ const NAV: NavItem[] = [
   { href: "/engagements", label: "Engagements", icon: Handshake },
   { href: "/pathways", label: "Partner Pathways", icon: Route },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/audit", label: "Audit History", icon: FileText },
   { href: "/validation", label: "Validation Console", icon: ShieldAlert },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
-  const { result, loading, loadFromFile, refresh, exportWorkbook, error, dirty, undo, canUndo } = useWorkbook()
+  const { result, loading, loadFromFile, refresh, exportWorkbook, error, dirty, undo, canUndo, notice, sourceRevision, connected, rememberedName, openSource, reconnect, forgetSource } = useWorkbook()
   const [importOpen, setImportOpen] = useState(false)
 
   const fileInput = useRef<HTMLInputElement>(null)
@@ -63,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="app-surface flex min-h-screen bg-background">
       <input
         ref={fileInput}
         type="file"
@@ -76,20 +79,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0",
+          "app-sidebar fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex items-center gap-2.5 px-5 py-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground font-bold">
-            F
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold">FIRtech</p>
-            <p className="text-xs text-sidebar-foreground/60">Automation Hub</p>
-          </div>
+        <div className="px-5 py-5">
+          <img src="/firtech-logo.jpg" alt="FIRtech" className="h-10 w-32 rounded object-cover" />
+          <p className="mt-2 text-xs tracking-wide text-sidebar-foreground/70">Intelligent Automation Hub</p>
         </div>
-
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
           {NAV.map((item) => {
             const active = pathname === item.href
@@ -128,6 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p>No workbook loaded</p>
           )}
         </div>
+        <Personalization />
       </aside>
 
       {mobileOpen ? (
@@ -160,8 +158,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">{result ? "Replace workbook" : "Open Excel"}</span>
             </Button>
-            <Button variant="outline" size="sm" aria-label="Save Excel workbook" onClick={exportWorkbook} disabled={loading || !result}>
-              <FileDown className="h-4 w-4" /><span className="hidden sm:inline">Save Excel</span>
+            <Button variant="outline" size="sm" aria-label={connected ? "Save Excel workbook" : "Download Excel workbook"} onClick={exportWorkbook} disabled={loading || !result}>
+              <FileDown className="h-4 w-4" /><span className="hidden sm:inline">{connected ? "Save Excel" : "Download Excel"}</span>
             </Button>
             <Button variant="outline" size="sm" aria-label="Refresh workbook" onClick={() => refresh()} disabled={loading || !result}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
@@ -176,15 +174,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <h1 id="open-workbook-title" className="text-2xl font-semibold">Open your Excel workbook</h1>
             <p className="mt-3 max-w-2xl text-muted-foreground">Choose an .xlsx file from any folder or accessible drive on your computer. Use the FIRtech reference layout or the detailed 14-sheet format.</p>
             <p className="my-5 text-sm text-muted-foreground">Reporting defaults to South African rand (ZAR). Original transaction currencies are retained.</p>
-            <div className="flex flex-wrap items-center gap-4"><Button disabled={loading} onClick={() => fileInput.current?.click()}><Upload className="h-4 w-4" />Choose Excel file</Button><a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
-            <p className="mt-5 text-sm text-muted-foreground">Files stay in your browser. Edit entries within each section, then Save Excel to write the updated workbook. Use Reports for filtered exports.</p>
+            <div className="flex flex-wrap items-center gap-4"><Button disabled={loading} onClick={() => { if (sourcePicker()) { void openSource(); setImportOpen(false) } else fileInput.current?.click() }}><Upload className="h-4 w-4" />Choose Excel file</Button><a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
+            <p className="mt-5 text-sm text-muted-foreground">With direct file access, applied edits save automatically to the chosen source workbook. Your browser remembers the connection for next time. Otherwise, download your edited workbook. Reports exports filtered tables separately.</p>
           </section>}
-          {result && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>{dirty ? "Unsaved workbook changes — use Save Excel to keep them." : "Workbook is up to date."}</span><Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || loading}>Undo last change</Button></div>}
-          {result && <WorkbookEditor key={pathname} route={pathname} />}
+          {!result && rememberedName && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4"><span className="text-sm">Remembered: {rememberedName}</span><Button disabled={loading} onClick={reconnect}>Reconnect workbook</Button><Button variant="outline" disabled={loading} onClick={forgetSource}>Forget file</Button></div>}
+          {result && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>{loading ? "Updating workbook…" : dirty ? "Pending changes — save or download to retain them." : connected ? "Autosave on · source workbook is up to date" : "Download mode · source file is not connected"}</span>{connected && <Button variant="ghost" size="sm" disabled={loading} onClick={forgetSource}>Forget file</Button>}<Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || loading}>Undo last change</Button></div>}
+          {result && !["/audit", "/reports"].includes(pathname) && <WorkbookEditor key={`${pathname}:${sourceRevision}`} route={pathname} />}
           {errorCount > 0 && <div role="alert" className="mb-5 rounded-lg border border-destructive p-4 text-sm">Calculations paused: {errorCount} workbook errors. <Link className="underline font-semibold" to="/validation">Open validation report</Link> and correct the workbook before replacing it.</div>}
           {result?.data && result.issues.some(i => i.severity === "warning") && <p className="mb-4 rounded-lg border border-border bg-card p-3 text-sm">Workbook loaded with {result.issues.filter(i => i.severity === "warning").length} notes about its data. <Link to="/validation" className="font-medium underline">Review import notes</Link>{result.data.overview.find(s => s.key === "DataStatus") && <span className="ml-2">Source status: {result.data.overview.find(s => s.key === "DataStatus")?.value}</span>}</p>}
+          {notice && <p role="status" className="mb-4 rounded border bg-card p-3 text-sm print:hidden">{notice}</p>}
           {error ? (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </div>
           ) : null}
@@ -211,7 +211,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
-
-
-
-

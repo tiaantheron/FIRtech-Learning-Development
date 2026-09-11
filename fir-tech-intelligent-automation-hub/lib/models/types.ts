@@ -59,6 +59,7 @@ export interface OverviewSetting {
 }
 
 export interface Department {
+  status?: string
   departmentId: string
   name: string
   head: string
@@ -147,6 +148,7 @@ export interface RevenueRecord extends CurrencyConversion {
 }
 
 export interface Engagement extends CurrencyConversion {
+  uniqueCustomer?: boolean
   departmentId?: string
   owner?: string
   engagementId: string

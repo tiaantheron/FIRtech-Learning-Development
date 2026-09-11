@@ -1,3 +1,4 @@
+import { deriveRow, DERIVED_COLUMNS } from "./derived-row"
 import * as XLSX from "xlsx"
 import { SHEET_DEFS, FX_COLUMNS } from "@/lib/models/schema"
 import { parseWorkbook } from "./parse"
@@ -11,6 +12,9 @@ export function readEditorSheet(buffer: ArrayBuffer, name: string): SheetView {
   const def = Object.values(SHEET_DEFS).find(d => d.sheet === name)
   const header = sheet ? (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[] ?? []) : def?.columns.map(c => c.header) ?? []
   const headers = [...header]
+  if (name === "Training") for (const h of ["AssignedDate", "CompletedDate"]) if (!headers.includes(h)) headers.push(h)
+  const statusColumn = name === "People" ? "EmploymentStatus" : name === "Departments" ? "Status" : null
+  if (statusColumn && !headers.includes(statusColumn)) headers.push(statusColumn)
   if (name === "Engagements") for (const h of ["ContractValue", "Date"]) if (!headers.includes(h)) headers.push(h)
   if (monetary.includes(name)) for (const h of ["Currency", ...FX_COLUMNS.map(c => c.header)]) if (!headers.includes(h)) headers.push(h)
   const formulas: Record<string, boolean> = {}
@@ -32,6 +36,7 @@ export function readEditorSheet(buffer: ArrayBuffer, name: string): SheetView {
 export function workbookSheetNames(buffer: ArrayBuffer) { return XLSX.read(buffer, { type: "array", bookSheets: true }).SheetNames }
 
 export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, rowNumber: number | null, values: Record<string, CellValue>, action: "save" | "delete") {
+  if (sheetName === "Audit") throw new Error("Audit history is read-only in the application.")
   const { default: ExcelJS } = await import("exceljs")
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer)
@@ -47,25 +52,31 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
     view.headers.forEach((_, i) => { row.getCell(i + 1).style = structuredClone(template.getCell(i + 1).style) })
   }
   const next = { ...values }
+  const lifecycleField = sheetName === "People" ? "EmploymentStatus" : sheetName === "Departments" ? "Status" : null
+  const archiving = action === "delete" && !!lifecycleField
+  const restoring = !!lifecycleField && String(original?.[lifecycleField]).toLowerCase() === "archived" && String(next[lifecycleField]).toLowerCase() === "active"
+  if (archiving && lifecycleField) { Object.assign(next, original); next[lifecycleField] = "Archived" }
+  if (action === "save" && ["Training", "TrainingAssignments", "Certifications"].includes(sheetName)) {
+    const personField = sheetName === "Training" ? "Person" : "PersonId"
+    if (!original || original[personField] !== next[personField]) {
+      const person = readEditorSheet(buffer, "People").rows.find(r => [r.values.PersonID, r.values.PersonId, r.values.FullName].includes(next[personField]))
+      if (String(person?.values.EmploymentStatus).toLowerCase() === "archived") throw new Error("Archived people cannot receive new or reassigned learning records. Restore the person first.")
+    }
+  }
+  if (action === "save" && sheetName === "Departments" && String(original?.Status).toLowerCase() === "archived" && String(next.Status).toLowerCase() !== "active" && ["RevenueTarget", "RevenueTargetZAR", "LeadTarget", "OpportunityTarget"].some(h => next[h] !== original?.[h])) throw new Error("Restore the archived department before assigning new targets.")
   if (action === "save") {
     if (monetary.includes(sheetName)) {
       next.Currency = String(next.Currency || "ZAR").toUpperCase()
       next.ReportingCurrency = String(next.ReportingCurrency || "ZAR").toUpperCase()
-      const amount = Number(next.Amount ?? next.EstimatedValue ?? next.ContractValue ?? 0)
-      next.ConvertedAmount = next.ExchangeRate === "" || next.ExchangeRate === undefined ? "" : Math.round(amount * Number(next.ExchangeRate) * 100) / 100
     }
-    if (view.headers.includes("Remaining")) next.Remaining = Math.max(Number(next.Required) - Number(next.Attained), 0)
-    if (view.headers.includes("WeightedValue")) {
-      const stage = String(next.Stage).toLowerCase(), probability = Number(next.Probability) > 1 ? Number(next.Probability) / 100 : Number(next.Probability)
-      next.WeightedValue = Math.round(Number(next.EstimatedValue) * (stage === "closed won" ? 1 : stage === "closed lost" ? 0 : probability) * 100) / 100
-    }
+    Object.assign(next, deriveRow(next, view.headers))
   }
   view.headers.forEach((h, i) => {
     const header = sheet.getRow(1).getCell(i + 1)
     if (!header.value) { header.value = h; header.style = structuredClone(sheet.getRow(1).getCell(1).style); sheet.getColumn(i + 1).width = Math.max(18, h.length + 2) }
     const cell = row.getCell(i + 1)
-    if (action === "delete") cell.value = null
-    else if (cell.type !== ExcelJS.ValueType.Formula || ["Remaining", "WeightedValue", "ConvertedAmount"].includes(h)) cell.value = next[h] === "" || next[h] === undefined ? null : next[h]
+    if (action === "delete" && !archiving) cell.value = null
+    else if (cell.type !== ExcelJS.ValueType.Formula || DERIVED_COLUMNS.includes(h)) cell.value = next[h] === "" || next[h] === undefined ? null : next[h]
   })
   // Name-based references in the nine-sheet layout follow a renamed person or department.
   const renameField = sheetName === "People" ? "FullName" : sheetName === "Departments" ? "Department" : ""
@@ -73,8 +84,9 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
     const referenceFields = renameField === "FullName" ? ["Person", "Owner", "Manager", "DeliveryLead"] : ["Department", "PrimaryDepartment", "OwningDepartment"]
     wb.eachSheet(s => { if (s.name === sheetName || s.name === "Audit") return; s.eachRow((r, n) => { if (n === 1) return; r.eachCell((c, col) => { if (referenceFields.includes(String(s.getRow(1).getCell(col).value)) && c.value === original[renameField]) c.value = next[renameField] }) }) })
   }
-  const audit = wb.getWorksheet("Audit")
-  if (audit && sheetName !== "Audit") audit.addRow([`AUD-${crypto.randomUUID()}`, new Date().toISOString(), "Dashboard user", sheetName, String(next[view.headers[0]] ?? original?.[view.headers[0]] ?? row.number), action === "delete" ? "Delete" : rowNumber ? "Update" : "Add", JSON.stringify(original ?? {}), action === "delete" ? "" : JSON.stringify(next), "Dashboard edit"])
+  const audit = wb.getWorksheet("Audit") ?? wb.addWorksheet("Audit")
+  if (audit.rowCount === 0) audit.addRow(["AuditID", "Timestamp", "User", "RecordType", "RecordID", "Action", "PreviousValue", "NewValue", "Reason"])
+  audit.addRow([`AUD-${crypto.randomUUID()}`, new Date().toISOString(), "Dashboard user", sheetName, String(next[view.headers[0]] ?? original?.[view.headers[0]] ?? row.number), archiving ? "Archive" : restoring ? "Restore" : action === "delete" ? "Delete" : rowNumber ? "Update" : "Add", JSON.stringify(original ?? {}), action === "delete" && !archiving ? "" : JSON.stringify(next), "Dashboard edit"])
   wb.calcProperties.fullCalcOnLoad = true
   const bytes = await wb.xlsx.writeBuffer()
   const output = new Uint8Array(bytes).buffer as ArrayBuffer

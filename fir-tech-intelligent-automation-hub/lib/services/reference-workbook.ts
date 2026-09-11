@@ -31,12 +31,12 @@ export function adaptReferenceWorkbook(source: XLSX.WorkBook) {
   const fx = (r: Record<string, string | number>) => Object.fromEntries(FX_COLUMNS.map(c => [c.header, r[c.header] ?? '']))
   const mapped: Record<string, Record<string, unknown>[]> = {
     Overview: settings.map(r => ({ Key: r.Setting, Value: r.Value })),
-    Departments: departments.map(r => ({ DepartmentId: r.DepartmentID, Name: r.Department, Head: r.Head, RevenueAllocationPct: r.RevenueAllocation, RevenueTargetZAR: r.RevenueTarget, LeadTarget: r.LeadTarget, OpportunityTarget: r.OpportunityTarget })),
+    Departments: departments.map(r => ({ DepartmentId: r.DepartmentID, Status: r.Status || "Active", Name: r.Department, Head: r.Head, RevenueAllocationPct: r.RevenueAllocation, RevenueTargetZAR: r.RevenueTarget, LeadTarget: r.LeadTarget, OpportunityTarget: r.OpportunityTarget })),
     People: people.map(r => ({ PersonId: r.PersonID, FullName: r.FullName, JobTitle: r.JobTitle, PrimaryDepartmentId: department(r.PrimaryDepartment), SecondaryDepartmentIds: "", ManagerId: person(r.Manager), EmploymentStatus: r.EmploymentStatus, UiPathId: "" })),
     DepartmentMemberships: rows("Memberships").filter(r => !r.Status || r.Status === "Active").map(r => ({ MembershipId: r.MembershipID, PersonId: person(r.Person), DepartmentId: department(r.Department), Role: r.Role, IsPrimary: false })),
-    TrainingAssignments: rows("Training").map(r => ({ AssignmentId: r.AssignmentID, PersonId: person(r.Person), CourseName: r.Course, Status: title(r.Status) === "Overdue" ? "In Progress" : title(r.Status), AssignedDate: "", DueDate: r.DueDate, CompletedDate: "" })),
+    TrainingAssignments: rows("Training").map(r => ({ AssignmentId: r.AssignmentID, PersonId: person(r.Person), CourseName: r.Course, Status: title(r.Status) === "Overdue" ? "In Progress" : title(r.Status), AssignedDate: r.AssignedDate ?? "", DueDate: r.DueDate, CompletedDate: r.CompletedDate ?? "" })),
     Opportunities: rows("Opportunities").map(r => ({ ...fx(r), OpportunityId: r.RecordID, Customer: r.Customer, Name: r.Opportunity, Owner: person(r.Owner), DepartmentId: department(r.OwningDepartment), EstimatedValue: r.EstimatedValue, Currency: r.Currency || currency, Probability: r.Probability, Stage: title(r.Stage), CloseDate: r.ExpectedClose })),
-    Engagements: rows("Engagements").map(r => ({ ...fx(r), EngagementId: r.EngagementID, Customer: r.Customer, Name: r.Engagement, Type: String(r.Type).toLowerCase().includes("resell") ? "Resell Customer Engagement" : String(r.Type).toLowerCase().includes("professional services") ? "Professional Services Engagement" : r.Type, DepartmentId: department(r.OwningDepartment), Owner: person(r.DeliveryLead), QualificationStatus: r.QualificationStatus === "Qualifies" ? "Qualified" : r.QualificationStatus, ContractValue: r.ContractValue ?? 0, Currency: r.Currency || currency, NPSStatus: r.NPS, CSATStatus: r.CSAT, Date: r.Date ?? "" })),
+    Engagements: rows("Engagements").map(r => ({ ...fx(r), EngagementId: r.EngagementID, UniqueCustomer: r.UniqueCustomer ?? false, Customer: r.Customer, Name: r.Engagement, Type: String(r.Type).toLowerCase().includes("resell") ? "Resell Customer Engagement" : String(r.Type).toLowerCase().includes("professional services") ? "Professional Services Engagement" : r.Type, DepartmentId: department(r.OwningDepartment), Owner: person(r.DeliveryLead), QualificationStatus: r.QualificationStatus === "Qualifies" ? "Qualified" : r.QualificationStatus, ContractValue: r.ContractValue ?? 0, Currency: r.Currency || currency, NPSStatus: r.NPS, CSATStatus: r.CSAT, Date: r.Date ?? "" })),
   }
   for (const pathway of ["Resell", "Services"]) {
     mapped[pathway + "Requirements"] = rows("Requirements").filter(r => r.Pathway === pathway).map(r => ({ RequirementId: r.RequirementID, Requirement: r.Requirement, RequiredValue: r.Required, AttainedValue: r.Attained, Unit: String(r.Requirement).includes("USD") ? "USD" : "", Owner: r.Owner, DepartmentId: department(r.Department), DueDate: r.DueDate, Status: r.Notes === "Maintain" ? "Maintain" : r.Status === "At risk" ? "Outstanding" : r.Status }))
@@ -65,4 +65,7 @@ export function adaptReferenceWorkbook(source: XLSX.WorkBook) {
   }
   return { workbook, issues, remapIssue }
 }
+
+
+
 

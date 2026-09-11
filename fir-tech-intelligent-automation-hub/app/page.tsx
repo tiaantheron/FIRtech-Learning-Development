@@ -64,6 +64,7 @@ export default function OverviewPage() {
         description={`Partner readiness for ${getSetting(data, "CompanyName", "FIRtech")} · ${getSetting(data, "FiscalYear", "")}`}
         actions={<GlobalFilters />}
       />
+      <p className="text-sm text-muted-foreground">UiPath source refreshed: {getSetting(data, "SourceRefreshDate", "Not supplied in workbook")}. Source status: {getSetting(data, "DataStatus", "Not specified")}.</p>
 
       {/* Pathways */}
       <section className="space-y-3">
@@ -143,7 +144,7 @@ export default function OverviewPage() {
                 <Stat label="Total pipeline" value={formatCurrency(pipe.totalPipeline)} />
                 <Stat label="Weighted pipeline" value={formatCurrency(pipe.weightedPipeline)} />
                 <Stat label="Won revenue" value={formatCurrency(pipe.wonRevenue)} />
-                <Stat label="Conversion" value={formatPercent(pipe.conversionRate)} />
+                <Stat label="Closed opportunity win rate" value={formatPercent(pipe.conversionRate)} />
               </dl>
             </CardContent>
           </Card>
@@ -199,4 +200,5 @@ function Stat({ label, value }: { label: string; value: string | number }) {
     </div>
   )
 }
+
 

@@ -144,6 +144,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   // Training statuses valid + person exists
   data.trainingAssignments.forEach((t, i) => {
+    if (t.status === "Completed" && !t.completedDate) issue("TrainingAssignments", t, i, "CompletedDate", "Completed training requires a completion date.")
     const row = (t as typeof t & { __rowNum__?: number }).__rowNum__ ?? i + 2
     if (!personIds.has(t.personId)) {
       issues.push({
@@ -239,8 +240,9 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   })
 
   // Department revenue allocations should sum to ~100%
-  const allocTotal = data.departments.reduce((s, d) => s + (d.revenueAllocationPct || 0), 0)
-  if (data.departments.length > 0 && Math.abs(allocTotal - 1) > 0.01) {
+  const activeDepartments = data.departments.filter(d => !["archived", "inactive"].includes((d.status ?? "Active").toLowerCase()))
+  const allocTotal = activeDepartments.reduce((s, d) => s + (d.revenueAllocationPct || 0), 0)
+  if (activeDepartments.length > 0 && Math.abs(allocTotal - 1) > 0.000001) {
     issues.push({
       severity: "warning",
       worksheet: "Departments",

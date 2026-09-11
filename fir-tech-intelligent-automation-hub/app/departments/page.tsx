@@ -26,6 +26,7 @@ export default function DepartmentsPage() {
   const columns: Column<DepartmentPerformance>[] = [
     { key: "name", header: "Department", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
     { key: "head", header: "Head", sortable: true },
+    { key: "status", header: "Status", render: r => deptById.get(r.departmentId)?.status || "Active" },
     {
       key: "alloc",
       header: "Allocation",
@@ -65,6 +66,7 @@ export default function DepartmentsPage() {
           return (
             <Card key={p.departmentId} className="p-5">
               <p className="text-sm font-semibold">{p.name}</p>
+              <p className="text-xs text-muted-foreground">{dept?.status || "Active"}</p>
               <p className="text-xs text-muted-foreground">{p.head || "Unassigned"}</p>
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Revenue" value={`${formatCurrency(p.revenueAttainedZAR)} / ${formatCurrency(p.revenueTargetZAR)}`} />

@@ -47,6 +47,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     if (!file.name.toLowerCase().endsWith(".xlsx")) throw new Error("Please select an .xlsx workbook.")
     const bytes = await file.arrayBuffer()
     const parsed = parseWorkbook(bytes, file.name)
+    if (!parsed.data) throw new Error("Workbook does not match the supported format: " + parsed.issues.filter(i => i.severity === "error").slice(0, 5).map(i => `${i.worksheet}: ${i.field ?? ""} ${i.message}`).join("; "))
     setResult(parsed); setBuffer(bytes); saved.current = bytes; handle.current = connection
     setSourceRevision(revision => revision + 1)
     history.current = []; setConnected(!!connection); setDirty(false); setFilters(EMPTY_FILTERS); setNotice(null)
@@ -58,6 +59,13 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   }
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    fetch("/firtech_dashboard.xlsx", { cache: "no-store" }).then(async response => {
+      if (!response.ok) throw new Error("Could not load the default Excel workbook. Replace the workbook to continue.")
+      const bytes = await response.arrayBuffer()
+      if (!cancelled && !interacted.current) await install(new File([bytes], "firtech_dashboard.xlsx"), null)
+    }).catch(e => { if (!cancelled && !interacted.current) setError(message(e)) })
+      .finally(() => { if (!cancelled && !interacted.current) setLoading(false) })
     rememberedSource().then(connection => {
       if (!cancelled && !interacted.current && connection) { remembered.current = connection; setRememberedName(connection.name) }
     }).catch(() => {})
@@ -161,3 +169,4 @@ export function useWorkbookData(filtered = true) {
   const { result, filters } = useWorkbook()
   return useMemo(() => { if (!result?.data) return null; const data = applyOverrides(result.data); return filtered ? filterWorkbook(data, filters) : data }, [result, filters, filtered])
 }
+

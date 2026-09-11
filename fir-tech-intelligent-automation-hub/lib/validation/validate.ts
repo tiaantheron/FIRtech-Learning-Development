@@ -10,7 +10,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   for (const [sheet, rows] of [["Leads", data.leads], ["Opportunities", data.opportunities], ["Revenue", data.revenue], ["Engagements", data.engagements]] as const) {
     rows.forEach((record, i) => {
       if (!/^[A-Z]{3}$/.test(record.currency)) issue(sheet, record, i, "Currency", "Original currency must be a three-letter code, such as ZAR, USD or EUR.")
-      const hasConversion = record.exchangeRate !== undefined || record.convertedAmount !== undefined || !!record.exchangeRateDate || !!record.exchangeRateSource
+      const hasConversion = (record as typeof record & { __hasConversion?: boolean }).__hasConversion ?? (record.exchangeRate !== undefined || record.convertedAmount !== undefined || !!record.exchangeRateDate || !!record.exchangeRateSource)
       if (hasConversion) {
         if (!record.reportingCurrency || !/^[A-Z]{3}$/.test(record.reportingCurrency)) issue(sheet, record, i, "ReportingCurrency", "A conversion needs a three-letter reporting currency.")
         if (!record.exchangeRate || record.exchangeRate <= 0) issue(sheet, record, i, "ExchangeRate", "A conversion needs a positive exchange rate (reporting units per original unit).")
@@ -30,14 +30,14 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
     })
   }
   data.certifications.forEach((c, i) => {
-    if (!CERT_STATUSES.includes(c.status)) issue("Certifications", c, i, "Status", `Unknown certification status: ${c.status}`)
+    if (c.status && !CERT_STATUSES.includes(c.status)) issue("Certifications", c, i, "Status", `Unknown certification status: ${c.status}`)
   })
   data.reportingPeriods.forEach((p, i) => {
     if (!p.startDate || !p.endDate || p.startDate > p.endDate) issue("ReportingPeriods", p, i, "EndDate", "A period needs valid start/end dates in chronological order.")
   })
   for (const [sheet, requirements] of [["ResellRequirements", data.resellRequirements], ["ServicesRequirements", data.servicesRequirements]] as const) {
     requirements.forEach((r, i) => {
-      if (!REQUIREMENT_STATUSES.includes(r.status)) issue(sheet, r, i, "Status", "Status must be Achieved, Outstanding or Maintain.")
+      if (r.status && !REQUIREMENT_STATUSES.includes(r.status)) issue(sheet, r, i, "Status", "Status must be Achieved, Outstanding or Maintain.")
       if (r.requiredValue < 0 || r.attainedValue < 0) issue(sheet, r, i, "AttainedValue", "Requirement values must be non-negative.")
       if (r.status === "Achieved" && r.attainedValue < r.requiredValue && r.unit.toLowerCase() !== "boolean") issue(sheet, r, i, "Status", "Supplied achieved status differs from numerical attainment; supplied values are preserved.", "warning")
     })
@@ -155,7 +155,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
         message: `Training assignment references unknown person "${t.personId}".`,
       })
     }
-    if (!TRAINING_STATUSES.includes(t.status)) {
+    if (t.status && !TRAINING_STATUSES.includes(t.status)) {
       issues.push({
         severity: "error",
         worksheet: "TrainingAssignments",
@@ -256,7 +256,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
   const qualifiedSeen = new Set<string>()
   data.engagements.forEach((e, i) => {
     const row = (e as typeof e & { __rowNum__?: number }).__rowNum__ ?? i + 2
-    if (!ENGAGEMENT_CATEGORIES.includes(e.type)) {
+    if (e.type && !ENGAGEMENT_CATEGORIES.includes(e.type)) {
       issues.push({
         severity: "error",
         worksheet: "Engagements",
@@ -296,5 +296,7 @@ export function validateWorkbook(data: WorkbookData): ValidationIssue[] {
 
   return issues
 }
+
+
 
 

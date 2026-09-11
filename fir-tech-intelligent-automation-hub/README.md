@@ -15,7 +15,7 @@ Open the local address printed by Vite. `pnpm build` type-checks and builds the 
 
 ## Workbook workflow
 
-Click **Choose Excel file** to browse any folder or accessible drive. Where the browser exposes the File System Access API, allow read/write access: each applied edit, addition, removal or undo automatically saves to that same source file. Intermediate form typing is not saved. Invalid changes are rejected; allocation changes remain pending until active allocations total 100%. The app serializes writes and indicates pending changes or save failures. File locks, revoked access and changed source bytes stop saving without intentionally overwriting the newer file. Close Excel if it holds a lock, then use **Save Excel** to retry. This byte comparison is not an atomic multi-user lock.
+The dashboard automatically loads `/firtech_dashboard.xlsx` (the reference in `public/`) on startup. Excel remains the dataset source. Use **Replace workbook** to browse any folder or accessible drive; the replacement must match the reference layout or the supported detailed format. Invalid replacements leave the current workbook intact. The bundled default is served read-only: connect a local workbook to enable automatic source writes, or download edits. Where the browser exposes the File System Access API, allow read/write access: each applied edit, addition, removal or undo automatically saves to that same source file. Intermediate form typing is not saved. Invalid changes are rejected; allocation changes remain pending until active allocations total 100%. The app serializes writes and indicates pending changes or save failures. File locks, revoked access and changed source bytes stop saving without intentionally overwriting the newer file. Close Excel if it holds a lock, then use **Save Excel** to retry. This byte comparison is not an atomic multi-user lock.
 
 The browser remembers the file handle in IndexedDB, without storing workbook contents or a raw path. On the next visit, **Reconnect workbook** requests access and reads the current source. Access is specific to this browser profile and application origin; moving the file, clearing browser data or changing the local server address can require selection again. **Forget file** removes the remembered connection and switches the current workbook to download mode. Business data stays in memory until written to Excel.
 
@@ -94,3 +94,6 @@ The bottom-left **Personalize** control offers FIRtech Blue, Indigo Slate and Fo
 ## Verification scope
 
 The regression suite covers workbook parsing, calculations, record lifecycle, styles, exports/report selection and source-write success/conflicts/permission and disk failures. Browser file-picker permissions and remembered-handle recovery still need a manual check in the target browser. No backend, multi-user locking or authenticated audit was added.
+
+Missing numeric cells default to 0; descriptive text remains blank. Required worksheet headers and unique record identifiers are still validated, as are supplied dates, relationships and conversion metadata. Blank rows do not create entries. ZAR remains the currency default.
+

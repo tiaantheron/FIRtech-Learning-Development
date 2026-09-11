@@ -128,3 +128,15 @@ test("reference missing columns are errors and the default currency is ZAR", () 
   delete wb.Sheets.Training.E1
   assert.equal(parse(XLSX.write(wb, { type: "buffer", bookType: "xlsx" })).data, null)
 })
+
+test("missing numeric cells default to zero and optional text stays blank", () => {
+  const result = changed("Revenue", "C2", "")
+  assert.ok(result.data, JSON.stringify(result.issues))
+  assert.equal(result.data.revenue[0].amount, 0)
+  assert.equal(result.data.revenue[0].exchangeRate, 0)
+  assert.equal(result.data.revenue[0].exchangeRateSource, "")
+  const blankText = changed("People", "B2", "")
+  assert.ok(blankText.data, JSON.stringify(blankText.issues))
+  assert.equal(blankText.data.people[0].fullName, "")
+})
+

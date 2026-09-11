@@ -32,7 +32,7 @@ function coerceValue(
   const empty = raw === null || raw === undefined || String(raw).trim() === ""
   if (empty && col.key === "currency") return "ZAR"
 
-  if (col.required && empty) {
+  if (col.required && col.unique && empty) {
     issues.push({
       severity: "error",
       worksheet: sheet,
@@ -53,7 +53,7 @@ function coerceValue(
             .map((s) => s.trim())
             .filter(Boolean)
     case "number": {
-      if (empty) return col.optional ? undefined : 0
+      if (empty) return 0
       const n = typeof raw === "number" ? raw : Number(String(raw).trim())
       if (!Number.isFinite(n)) {
         issues.push({
@@ -156,6 +156,7 @@ function parseSheet(
   rows.forEach((row, idx) => {
     const rowNumber = typeof row.__rowNum__ === "number" ? row.__rowNum__ + 1 : idx + 2
     const obj: Record<string, unknown> = {}
+    Object.defineProperty(obj, "__hasConversion", { value: ["ExchangeRate", "ConvertedAmount", "ExchangeRateDate", "ExchangeRateSource"].some(key => row[key] != null && String(row[key]).trim() !== ""), enumerable: false })
     Object.defineProperty(obj, "__rowNum__", { value: rowNumber, enumerable: false })
     for (const col of def.columns) {
       const value = coerceValue(row[col.header], col, def.sheet, rowNumber, issues)
@@ -250,3 +251,5 @@ export function parseWorkbook(buffer: ArrayBuffer, fileName: string): ParseResul
     fileName,
   }
 }
+
+

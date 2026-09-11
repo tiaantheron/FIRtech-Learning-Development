@@ -169,15 +169,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6 lg:py-8">
-          {(!result || importOpen) && <section className="mb-6 rounded-xl border border-border bg-card p-6 sm:p-10" aria-labelledby="open-workbook-title">
+          {((!result && !loading) || importOpen) && <section className="mb-6 rounded-xl border border-border bg-card p-6 sm:p-10" aria-labelledby="open-workbook-title">
             <FileDown className="mb-4 h-9 w-9 text-primary" />
-            <h1 id="open-workbook-title" className="text-2xl font-semibold">Open your Excel workbook</h1>
-            <p className="mt-3 max-w-2xl text-muted-foreground">Choose an .xlsx file from any folder or accessible drive on your computer. Use the FIRtech reference layout or the detailed 14-sheet format.</p>
+            <h1 id="open-workbook-title" className="text-2xl font-semibold">Replace the Excel workbook</h1>
+            <p className="mt-3 max-w-2xl text-muted-foreground">The FIRtech reference workbook loads by default and establishes the worksheet format. Replace it with a workbook using that layout or the supported detailed 14-sheet format. Incompatible files are rejected without replacing the current dashboard.</p>
             <p className="my-5 text-sm text-muted-foreground">Reporting defaults to South African rand (ZAR). Original transaction currencies are retained.</p>
             <div className="flex flex-wrap items-center gap-4"><Button disabled={loading} onClick={() => { if (sourcePicker()) { void openSource(); setImportOpen(false) } else fileInput.current?.click() }}><Upload className="h-4 w-4" />Choose Excel file</Button><a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
             <p className="mt-5 text-sm text-muted-foreground">With direct file access, applied edits save automatically to the chosen source workbook. Your browser remembers the connection for next time. Otherwise, download your edited workbook. Reports exports filtered tables separately.</p>
           </section>}
-          {!result && rememberedName && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4"><span className="text-sm">Remembered: {rememberedName}</span><Button disabled={loading} onClick={reconnect}>Reconnect workbook</Button><Button variant="outline" disabled={loading} onClick={forgetSource}>Forget file</Button></div>}
+          {!connected && rememberedName && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4"><span className="text-sm">Remembered: {rememberedName}</span><Button disabled={loading} onClick={reconnect}>Reconnect workbook</Button><Button variant="outline" disabled={loading} onClick={forgetSource}>Forget file</Button></div>}
           {result && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>{loading ? "Updating workbook…" : dirty ? "Pending changes — save or download to retain them." : connected ? "Autosave on · source workbook is up to date" : "Download mode · source file is not connected"}</span>{connected && <Button variant="ghost" size="sm" disabled={loading} onClick={forgetSource}>Forget file</Button>}<Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || loading}>Undo last change</Button></div>}
           {result && !["/audit", "/reports"].includes(pathname) && <WorkbookEditor key={`${pathname}:${sourceRevision}`} route={pathname} />}
           {errorCount > 0 && <div role="alert" className="mb-5 rounded-lg border border-destructive p-4 text-sm">Calculations paused: {errorCount} workbook errors. <Link className="underline font-semibold" to="/validation">Open validation report</Link> and correct the workbook before replacing it.</div>}
@@ -211,3 +211,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+

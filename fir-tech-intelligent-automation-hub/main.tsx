@@ -1,3 +1,5 @@
+import { Evidence } from "./components/evidence"
+import { UserManagement } from "./components/accounts"
 import React from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom"
@@ -17,5 +19,7 @@ const Audit = React.lazy(() => import("./app/audit/page"))
 import "./app/globals.css"
 
 createRoot(document.getElementById("root")!).render(<React.StrictMode><BrowserRouter><WorkbookProvider><AppShell><React.Suspense fallback={<p className="text-sm text-muted-foreground">Loading section…</p>}><Routes>
-  <Route path="/" element={<Overview/>}/><Route path="/departments" element={<Departments/>}/><Route path="/people" element={<People/>}/><Route path="/training" element={<Training/>}/><Route path="/pipeline" element={<Pipeline/>}/><Route path="/revenue" element={<Revenue/>}/><Route path="/engagements" element={<Engagements/>}/><Route path="/pathways" element={<Pathways/>}/><Route path="/reports" element={<Reports/>}/><Route path="/audit" element={<Audit/>}/><Route path="/validation" element={<Validation/>}/><Route path="*" element={<p>Page not found. <Link to="/">Return to overview</Link></p>}/>
+  <Route path="/evidence" element={<Evidence/>}/><Route path="/users" element={<UserManagement/>}/><Route path="/" element={<Overview/>}/><Route path="/departments" element={<Departments/>}/><Route path="/people" element={<People/>}/><Route path="/training" element={<Training/>}/><Route path="/pipeline" element={<Pipeline/>}/><Route path="/revenue" element={<Revenue/>}/><Route path="/engagements" element={<Engagements/>}/><Route path="/pathways" element={<Pathways/>}/><Route path="/reports" element={<Reports/>}/><Route path="/audit" element={<Audit/>}/><Route path="/validation" element={<Validation/>}/><Route path="*" element={<p>Page not found. <Link to="/">Return to overview</Link></p>}/>
 </Routes></React.Suspense></AppShell></WorkbookProvider></BrowserRouter></React.StrictMode>)
+
+

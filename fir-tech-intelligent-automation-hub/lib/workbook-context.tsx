@@ -1,3 +1,6 @@
+import { accounts, authenticate, GUEST, assertEdit, scopeData, type Account } from "./services/permissions"
+import { ensureAccounts } from "./services/accounts-workbook"
+import { readEditorSheet } from "./services/workbook-editor"
 import { createContext, useContext, useMemo, useState, useRef, useEffect } from "react"
 import { filterWorkbook, applyOverrides } from "@/lib/calculations/filter"
 import type { ParseResult } from "@/lib/models/types"
@@ -9,6 +12,7 @@ import { assertWorkbookSaveable } from "@/lib/services/save-checks"
 import { sourcePicker, excelTypes, rememberedSource, writeSource, type WorkbookHandle } from "@/lib/services/file-connection"
 
 interface WorkbookContextValue {
+  user: Account; signIn: (username: string, password: string) => Promise<void>; signOut: () => void
   result: ParseResult | null; buffer: ArrayBuffer | null; dirty: boolean; canUndo: boolean; loading: boolean; error: string | null; notice: string | null
   sourceRevision: number; connected: boolean; rememberedName: string | null
   filters: Filters; setFilters: (f: Filters) => void
@@ -18,6 +22,7 @@ interface WorkbookContextValue {
 }
 const WorkbookContext = createContext<WorkbookContextValue | null>(null)
 export function WorkbookProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Account>(GUEST)
   const [result, setResult] = useState<ParseResult | null>(null)
   const [buffer, setBuffer] = useState<ArrayBuffer | null>(null)
   const [loading, setLoading] = useState(false)
@@ -34,6 +39,14 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   const saved = useRef<ArrayBuffer | null>(null)
   const busy = useRef(false)
   const interacted = useRef(false)
+  const user = useMemo(() => buffer && session.Username ? accounts(buffer).find(a => a.Username === session.Username && a.Active && a.PasswordHash === session.PasswordHash) ?? GUEST : GUEST, [buffer, session])
+  const requireAdmin = () => { if (user.Role !== "Administrator") throw new Error("Administrator permission is required.") }
+  async function signIn(username: string, password: string) {
+    if (!buffer || busy.current) throw new Error("Wait for the workbook to finish loading.")
+    const account = await authenticate(buffer, username, password)
+    setSession(account); setFilters(EMPTY_FILTERS); history.current = []
+  }
+  function signOut() { if (busy.current) return; setSession(GUEST); setFilters(EMPTY_FILTERS); history.current = [] }
   const message = (e: unknown) => e instanceof Error ? e.message : "File operation failed. Your pending edits remain in this tab."
   async function run(action: () => Promise<void>) {
     if (busy.current) return
@@ -45,12 +58,13 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   function canReplace() { return !busy.current && (!dirty || window.confirm("Discard unsaved edits and reload or replace this workbook?")) }
   async function install(file: File, connection: WorkbookHandle | null) {
     if (!file.name.toLowerCase().endsWith(".xlsx")) throw new Error("Please select an .xlsx workbook.")
-    const bytes = await file.arrayBuffer()
+    const original = await file.arrayBuffer()
+    const bytes = await ensureAccounts(original)
     const parsed = parseWorkbook(bytes, file.name)
     if (!parsed.data) throw new Error("Workbook does not match the supported format: " + parsed.issues.filter(i => i.severity === "error").slice(0, 5).map(i => `${i.worksheet}: ${i.field ?? ""} ${i.message}`).join("; "))
-    setResult(parsed); setBuffer(bytes); saved.current = bytes; handle.current = connection
+    setResult(parsed); setBuffer(bytes); saved.current = original; handle.current = connection
     setSourceRevision(revision => revision + 1)
-    history.current = []; setConnected(!!connection); setDirty(false); setFilters(EMPTY_FILTERS); setNotice(null)
+    history.current = []; setConnected(!!connection); setDirty(bytes !== original); setFilters(EMPTY_FILTERS); setNotice(null); setSession(GUEST)
   }
   async function remember(connection: WorkbookHandle | null) {
     remembered.current = connection; setRememberedName(connection?.name ?? null)
@@ -77,11 +91,13 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("beforeunload", guard)
   }, [dirty])
   async function loadFromFile(file: File) {
+    requireAdmin()
     interacted.current = true
     if (!canReplace()) return
     await run(async () => { await install(file, null); await remember(null) })
   }
   async function openSource() {
+    requireAdmin()
     interacted.current = true
     if (!canReplace()) return
     await run(async () => {
@@ -93,6 +109,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     })
   }
   async function reconnect() {
+    requireAdmin()
     interacted.current = true
     if (!canReplace() || !remembered.current) return
     await run(async () => {
@@ -102,6 +119,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     })
   }
   async function forgetSource() {
+    requireAdmin()
     if (busy.current) return
     interacted.current = true; handle.current = null; setConnected(false)
     setNotice("File connection forgotten. Use Download Excel to keep any further edits.")
@@ -117,9 +135,10 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   }
   async function editRecord(sheet: string, row: number | null, values: Record<string, CellValue>, action: "save" | "delete") {
     if (!buffer || !result || busy.current) throw new Error("Workbook is busy. Please try again.")
+    assertEdit(user, result.data!, sheet, row ? readEditorSheet(buffer, sheet).rows.find(r => r.row === row)?.values : undefined, values, action)
     busy.current = true; setLoading(true); setError(null)
     try {
-      const next = await mutateWorkbook(buffer, sheet, row, values, action)
+      const next = await mutateWorkbook(buffer, sheet, row, values, action, user.Username === "admin" ? "System administrator" : user.Username)
       const parsed = parseWorkbook(next, result.fileName)
       history.current = [...history.current.slice(-19), buffer]
       setBuffer(next); setResult(parsed); setDirty(true)
@@ -127,6 +146,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     } finally { busy.current = false; setLoading(false) }
   }
   async function undo() {
+    requireAdmin()
     if (!result || !history.current.length) return
     await run(async () => {
       const previous = history.current.pop()!
@@ -135,6 +155,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     })
   }
   async function exportWorkbook() {
+    requireAdmin()
     if (!buffer || !result) return
     await run(async () => {
       assertWorkbookSaveable(result)
@@ -154,11 +175,12 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     } else if (buffer && result) setResult(parseWorkbook(buffer, result.fileName))
   }
   function clear() {
+    requireAdmin()
     if (!canReplace()) return
     handle.current = null; saved.current = null; history.current = []
     setConnected(false); setBuffer(null); setResult(null); setError(null); setNotice(null); setDirty(false); setFilters(EMPTY_FILTERS)
   }
-  return <WorkbookContext.Provider value={{ result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, undo }}>{children}</WorkbookContext.Provider>
+  return <WorkbookContext.Provider value={{ user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, undo }}>{children}</WorkbookContext.Provider>
 }
 export function useWorkbook() {
   const ctx = useContext(WorkbookContext)
@@ -166,7 +188,8 @@ export function useWorkbook() {
   return ctx
 }
 export function useWorkbookData(filtered = true) {
-  const { result, filters } = useWorkbook()
-  return useMemo(() => { if (!result?.data) return null; const data = applyOverrides(result.data); return filtered ? filterWorkbook(data, filters) : data }, [result, filters, filtered])
+  const { result, filters, user } = useWorkbook()
+  return useMemo(() => { if (!result?.data) return null; const data = scopeData(applyOverrides(result.data), user); return filtered ? filterWorkbook(data, filters) : data }, [result, filters, filtered, user])
 }
+
 

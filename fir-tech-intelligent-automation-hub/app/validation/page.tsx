@@ -14,7 +14,7 @@ import { FileDown } from "lucide-react"
 import type { ValidationIssue } from "@/lib/models/types"
 
 export default function ValidationPage() {
-  const { result } = useWorkbook()
+  const { result, user } = useWorkbook()
   const [severity, setSeverity] = useState<"all" | "error" | "warning">("all")
   const [sheet, setSheet] = useState("all")
 
@@ -45,6 +45,7 @@ export default function ValidationPage() {
     { key: "message", header: "Description", render: (i) => <span className="text-muted-foreground">{i.message}</span> },
   ]
 
+  if (user.Role !== "Administrator") return <p>Administrator permission is required.</p>
   return (
     <div className="space-y-6">
       <PageHeader
@@ -103,4 +104,5 @@ export default function ValidationPage() {
     </div>
   )
 }
+
 

@@ -1,3 +1,4 @@
+import { USER_HEADERS, accounts } from "./permissions"
 import { deriveRow, DERIVED_COLUMNS } from "./derived-row"
 import * as XLSX from "xlsx"
 import { SHEET_DEFS, FX_COLUMNS } from "@/lib/models/schema"
@@ -10,8 +11,9 @@ export function readEditorSheet(buffer: ArrayBuffer, name: string): SheetView {
   const wb = XLSX.read(buffer, { type: "array", cellDates: true })
   const sheet = wb.Sheets[name]
   const def = Object.values(SHEET_DEFS).find(d => d.sheet === name)
-  const header = sheet ? (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[] ?? []) : def?.columns.map(c => c.header) ?? []
+  const header = sheet ? (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[] ?? []) : (name === "Users" ? USER_HEADERS : name === "Evidence" ? ["EvidenceId", "DepartmentId", "RecordId", "FileName", "ContentType", "Notes", ...Array.from({ length: 48 }, (_, i) => `Content${i + 1}`)] : def?.columns.map(c => c.header) ?? [])
   const headers = [...header]
+  if (["Training", "TrainingAssignments", "Certifications", "Leads", "Opportunities", "Revenue", "Engagements"].includes(name) && !headers.includes("Notes")) headers.push("Notes")
   if (name === "Training") for (const h of ["AssignedDate", "CompletedDate"]) if (!headers.includes(h)) headers.push(h)
   const statusColumn = name === "People" ? "EmploymentStatus" : name === "Departments" ? "Status" : null
   if (statusColumn && !headers.includes(statusColumn)) headers.push(statusColumn)
@@ -35,7 +37,7 @@ export function readEditorSheet(buffer: ArrayBuffer, name: string): SheetView {
 }
 export function workbookSheetNames(buffer: ArrayBuffer) { return XLSX.read(buffer, { type: "array", bookSheets: true }).SheetNames }
 
-export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, rowNumber: number | null, values: Record<string, CellValue>, action: "save" | "delete") {
+export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, rowNumber: number | null, values: Record<string, CellValue>, action: "save" | "delete", actor = "Dashboard user") {
   if (sheetName === "Audit") throw new Error("Audit history is read-only in the application.")
   const { default: ExcelJS } = await import("exceljs")
   const wb = new ExcelJS.Workbook()
@@ -45,6 +47,14 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
   if (!view.headers.length) throw new Error("No worksheet format is available.")
   const original = rowNumber ? view.rows.find(r => r.row === rowNumber)?.values : undefined
   if (rowNumber && !original) throw new Error("This entry no longer exists. Reopen the editor.")
+  if (sheetName === "Users") {
+    if (String(original?.Username ?? "").toLowerCase() === "admin" || String(values.Username ?? "").toLowerCase() === "admin") throw new Error("The built-in account cannot be modified.")
+    if (action !== "delete") {
+      if (!String(values.Username ?? "").trim() || !["Administrator", "Contributor", "Viewer"].includes(String(values.Role))) throw new Error("A username and valid role are required.")
+      if (!/^pbkdf2\$[^$]+\$[a-f0-9]{64}$/.test(String(values.PasswordHash))) throw new Error("Set a password for this account.")
+      if (accounts(buffer).some(a => a.Username.toLowerCase() === String(values.Username).toLowerCase() && a.Username !== original?.Username)) throw new Error("Username already exists.")
+    }
+  }
   const row = sheet.getRow(rowNumber ?? Math.max(sheet.rowCount + 1, 2))
   if (!rowNumber && sheet.rowCount > 1) {
     const template = sheet.getRow(Math.max(2, row.number - 1))
@@ -86,7 +96,8 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
   }
   const audit = wb.getWorksheet("Audit") ?? wb.addWorksheet("Audit")
   if (audit.rowCount === 0) audit.addRow(["AuditID", "Timestamp", "User", "RecordType", "RecordID", "Action", "PreviousValue", "NewValue", "Reason"])
-  audit.addRow([`AUD-${crypto.randomUUID()}`, new Date().toISOString(), "Dashboard user", sheetName, String(next[view.headers[0]] ?? original?.[view.headers[0]] ?? row.number), archiving ? "Archive" : restoring ? "Restore" : action === "delete" ? "Delete" : rowNumber ? "Update" : "Add", JSON.stringify(original ?? {}), action === "delete" && !archiving ? "" : JSON.stringify(next), "Dashboard edit"])
+  const redact = (value: unknown) => JSON.stringify(value, (key, v) => (key === "PasswordHash" || key.startsWith("Content")) ? "[redacted]" : v)
+  audit.addRow([`AUD-${crypto.randomUUID()}`, new Date().toISOString(), actor, sheetName, String(next[view.headers[0]] ?? original?.[view.headers[0]] ?? row.number), archiving ? "Archive" : restoring ? "Restore" : action === "delete" ? "Delete" : rowNumber ? "Update" : "Add", redact(original ?? {}), action === "delete" && !archiving ? "" : redact(next), "Dashboard edit"])
   wb.calcProperties.fullCalcOnLoad = true
   const bytes = await wb.xlsx.writeBuffer()
   const output = new Uint8Array(bytes).buffer as ArrayBuffer
@@ -94,3 +105,5 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
   if (parsed.issues.some(i => i.severity === "error")) throw new Error(parsed.issues.filter(i => i.severity === "error").map(i => `${i.worksheet} row ${i.row ?? "—"}, ${i.field ?? ""}: ${i.message}`).join("\n"))
   return output
 }
+
+

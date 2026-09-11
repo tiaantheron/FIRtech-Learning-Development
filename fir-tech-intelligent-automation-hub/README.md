@@ -1,6 +1,6 @@
 # FIRtech Intelligent Automation Hub
 
-A Phase 1, browser-only React + TypeScript application. Excel is the authoritative business record. No database, backend, authentication, browser business-data persistence, or cloud service is used.
+A Phase 1, browser-only React + TypeScript application. Excel is the authoritative business record. No database, server authentication service or cloud service is used. Optional workbook-based sign-in governs application actions; this is not a server-enforced security boundary.
 
 ## Run locally
 
@@ -79,7 +79,7 @@ Each section includes **Edit / add / remove**. Choose the source sheet, search f
 
 **Apply to workbook** validates the complete candidate workbook before replacing the in-memory version. Invalid changes show worksheet/row/field errors and do not change the source. Removing people/departments archives them instead of clearing their rows; Restore is available in the editor. Archived people cannot receive new assignments, and archived departments must be restored before assigning new targets. Reference-format person and department name edits update their name-based references automatically. Department allocation totals can temporarily differ from 100% while redistributing allocations, with a warning. Save Excel refuses to write until active allocations total 100%. Undo retains up to 20 complete workbook snapshots and restores the previous snapshot, including its audit state; connected sources save that undo automatically. Unsaved edits are indicated and closing/replacing the workbook prompts before discarding them.
 
-Applied changes automatically save when a source is connected; otherwise download the updated file. Pending changes remain in browser memory until a save succeeds. An Audit sheet is created when missing and records edits as Dashboard user. Audit History is read-only in the application and can be exported. This does not provide authenticated, tamper-resistant auditing. No authentication or database was introduced.
+Applied changes automatically save when a source is connected; otherwise download the updated file. Pending changes remain in browser memory until a save succeeds. An Audit sheet is created when missing and records edits as Dashboard user. Audit History is read-only in the application and can be exported. This does not provide authenticated, tamper-resistant auditing. Workbook-based roles are described below; no database or server authentication service was introduced.
 
 
 ## Original specification review
@@ -93,7 +93,21 @@ The bottom-left **Personalize** control offers FIRtech Blue, Indigo Slate and Fo
 
 ## Verification scope
 
-The regression suite covers workbook parsing, calculations, record lifecycle, styles, exports/report selection and source-write success/conflicts/permission and disk failures. Browser file-picker permissions and remembered-handle recovery still need a manual check in the target browser. No backend, multi-user locking or authenticated audit was added.
+The regression suite covers workbook parsing, calculations, record lifecycle, styles, exports/report selection and source-write success/conflicts/permission and disk failures. Browser file-picker permissions and remembered-handle recovery still need a manual check in the target browser. No backend or multi-user locking was added. Audit entries identify the signed-in workbook account, which is not a verified server identity.
 
 Missing numeric cells default to 0; descriptive text remains blank. Required worksheet headers and unique record identifiers are still validated, as are supplied dates, relationships and conversion metadata. Blank rows do not create entries. ZAR remains the currency default.
 
+
+## Roles and optional sign-in
+
+Every new visit starts as Viewer. Sign in from the lower-left sidebar. The built-in account is `admin` / `admin`; its salted PBKDF2 password hash and Administrator role are stored in the source workbook's separate Users worksheet. It is not added to People, ownership selectors or business reports and is excluded from the user-management list. Its edits are audited as System administrator. The built-in account cannot be modified through the app.
+
+Administrators manage users, departments, people, pathways, requirements, targets, allocations, overrides, periods, settings, imports, full-workbook exports, archives/restores and complete audit history. In Users & permissions, add accounts or change their roles, permitted department IDs, active status, report-export permission, and explicit pathway/user-management grants. Disable an account to remove access; password resets take effect immediately in the current session. Account passwords and evidence payloads are redacted from audit snapshots. Source replacements and reconnections end the current sign-in; sign in against the newly loaded Users sheet.
+
+Contributors can add/update training, certification, lead, opportunity, revenue and engagement records in their permitted departments, plus notes and supporting evidence. They cannot remove/archive records or edit configuration, calculations or user permissions. ManagePathways and ManageUsers are explicit optional grants. Department checks apply to both the original and new record to prevent moving records into or out of an unauthorised department. Use comma-separated department IDs; `*` means all departments and a blank list means none. Dashboard data and reports are scoped before applying interactive filters.
+
+Viewers can view, filter, search and open evidence. Signed-in Viewer accounts may export reports if ExportReports is enabled; anonymous Viewer has report exports disabled. Native browser printing/copying cannot be prevented. Full-workbook download remains Administrator-only.
+
+Supporting evidence accepts PDF, PNG, JPEG and plain text up to 1 MB each. Files are split across Excel-safe cell lengths in an Evidence worksheet, alongside department, related record ID and notes, and persist with the workbook. Administrators can remove evidence. Contributors can upload it; all roles can open evidence within their department scope.
+
+These are local application permissions. Anyone who can access the source Excel file or modify browser code can bypass them; the bundled file is a public static asset. Secure multi-user authorization, credential protection and authoritative audit require a server that checks every request and keeps the workbook and credentials private. No production security claim is made by this implementation.

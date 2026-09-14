@@ -1,0 +1,48 @@
+vite v7.3.6 building client environment for production...
+transforming...
+node_modules/.pnpm/react-router@7.18.3_react-d_e537425782e3876647b56456804babc0/node_modules/react-router/dist/development/index.mjs (11:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/react-router@7.18.3_react-d_e537425782e3876647b56456804babc0/node_modules/react-router/dist/development/index.mjs" was ignored.
+node_modules/.pnpm/react-router@7.18.3_react-d_e537425782e3876647b56456804babc0/node_modules/react-router/dist/development/dom-export.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/react-router@7.18.3_react-d_e537425782e3876647b56456804babc0/node_modules/react-router/dist/development/dom-export.mjs" was ignored.
+node_modules/.pnpm/lucide-react@1.43.0_react@19.2.8/node_modules/lucide-react/dist/esm/context.mjs (2:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/lucide-react@1.43.0_react@19.2.8/node_modules/lucide-react/dist/esm/context.mjs" was ignored.
+node_modules/.pnpm/lucide-react@1.43.0_react@19.2.8/node_modules/lucide-react/dist/esm/Icon.mjs (2:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/lucide-react@1.43.0_react@19.2.8/node_modules/lucide-react/dist/esm/Icon.mjs" was ignored.
+node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/button/Button.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/button/Button.mjs" was ignored.
+node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/internals/use-button/useButton.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/internals/use-button/useButton.mjs" was ignored.
+node_modules/.pnpm/@base-ui+utils@0.4.0_@types_61acc568471b9767d0a35df650a33683/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+utils@0.4.0_@types_61acc568471b9767d0a35df650a33683/node_modules/@base-ui/utils/useIsoLayoutEffect.mjs" was ignored.
+node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/utils/useFocusableWhenDisabled.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/utils/useFocusableWhenDisabled.mjs" was ignored.
+node_modules/.pnpm/@base-ui+utils@0.4.0_@types_61acc568471b9767d0a35df650a33683/node_modules/@base-ui/utils/useStableCallback.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+utils@0.4.0_@types_61acc568471b9767d0a35df650a33683/node_modules/@base-ui/utils/useStableCallback.mjs" was ignored.
+node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/internals/composite/root/CompositeRootContext.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+react@1.8.0_@types_f2249a04aab41b4e13b32a2868077017/node_modules/@base-ui/react/internals/composite/root/CompositeRootContext.mjs" was ignored.
+node_modules/.pnpm/@base-ui+utils@0.4.0_@types_61acc568471b9767d0a35df650a33683/node_modules/@base-ui/utils/useRefWithInit.mjs (1:0): Module level directives cause errors when bundled, "use client" in "node_modules/.pnpm/@base-ui+utils@0.4.0_@types_61acc568471b9767d0a35df650a33683/node_modules/@base-ui/utils/useRefWithInit.mjs" was ignored.
+✓ 2545 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                             0.50 kB │ gzip:   0.34 kB
+dist/assets/index-D57u-Eh9.css             41.67 kB │ gzip:   7.90 kB
+dist/assets/trending-up-BkGebfba.js         0.21 kB │ gzip:   0.19 kB
+dist/assets/circle-check-D-GeE0id.js        0.24 kB │ gzip:   0.21 kB
+dist/assets/award-CJzI_dNH.js               0.31 kB │ gzip:   0.25 kB
+dist/assets/triangle-alert-B2MRBqLy.js      0.33 kB │ gzip:   0.25 kB
+dist/assets/currency-details-C_ZNKnz1.js    0.43 kB │ gzip:   0.30 kB
+dist/assets/progress-B6Np8ft5.js            0.56 kB │ gzip:   0.35 kB
+dist/assets/pipeline-usd-Br9gMJj5.js        0.61 kB │ gzip:   0.33 kB
+dist/assets/revenue-history-ZFaUAVJq.js     0.74 kB │ gzip:   0.49 kB
+dist/assets/status-badge-DvMMNNPE.js        0.77 kB │ gzip:   0.44 kB
+dist/assets/kpi-card-CPHC_jQV.js            0.83 kB │ gzip:   0.47 kB
+dist/assets/badge-ELilEpN2.js               0.84 kB │ gzip:   0.43 kB
+dist/assets/page-header-D-u4_Rss.js         0.95 kB │ gzip:   0.48 kB
+dist/assets/global-filters-CnDVW8v6.js      0.96 kB │ gzip:   0.44 kB
+dist/assets/select-CvLpZvg0.js              1.10 kB │ gzip:   0.52 kB
+dist/assets/pathway-card-HmH6VZJE.js        1.82 kB │ gzip:   0.68 kB
+dist/assets/page-nxb_5TCL.js                1.96 kB │ gzip:   1.04 kB
+dist/assets/page-CLulwMk4.js                2.94 kB │ gzip:   1.13 kB
+dist/assets/page-CTFylK9M.js                3.55 kB │ gzip:   1.28 kB
+dist/assets/page-Bz3ZKMAr.js                3.62 kB │ gzip:   1.62 kB
+dist/assets/page-ZEytpY6u.js                4.08 kB │ gzip:   1.49 kB
+dist/assets/page-DKIXpNuR.js                4.55 kB │ gzip:   1.54 kB
+dist/assets/page-DJS0vVyz.js                4.68 kB │ gzip:   1.80 kB
+dist/assets/page-Me2HpeVr.js                4.69 kB │ gzip:   1.70 kB
+dist/assets/page-DF0QEnZY.js                4.76 kB │ gzip:   1.73 kB
+dist/assets/page-V306t587.js                6.13 kB │ gzip:   2.04 kB
+dist/assets/page-DrXp7t-R.js               11.27 kB │ gzip:   4.24 kB
+dist/assets/charts-y7NwqSBS.js            417.55 kB │ gzip: 119.58 kB
+dist/assets/index-DNI-JZk7.js             795.92 kB │ gzip: 260.63 kB
+dist/assets/exceljs.min-jJymbVrq.js       936.98 kB │ gzip: 270.74 kB
+✓ built in 16.96s

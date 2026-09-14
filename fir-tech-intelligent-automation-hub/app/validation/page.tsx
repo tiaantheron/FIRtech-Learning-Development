@@ -1,3 +1,4 @@
+import { assertWorkbookSaveable } from "@/lib/services/save-checks"
 
 
 import { useMemo, useState } from "react"
@@ -18,7 +19,14 @@ export default function ValidationPage() {
   const [severity, setSeverity] = useState<"all" | "error" | "warning">("all")
   const [sheet, setSheet] = useState("all")
 
-  const issues = result?.issues ?? []
+  const issues = useMemo(() => {
+    const found = [...(result?.issues ?? [])]
+    if (result?.data) {
+      try { assertWorkbookSaveable(result) }
+      catch (e) { found.push({ severity: "error", worksheet: "Departments", row: null, field: "RevenueAllocation", message: (e as Error).message }) }
+    }
+    return found
+  }, [result])
   const errors = issues.filter((i) => i.severity === "error").length
   const warnings = issues.filter((i) => i.severity === "warning").length
   const sheets = Array.from(new Set(issues.map((i) => i.worksheet))).sort()
@@ -104,5 +112,3 @@ export default function ValidationPage() {
     </div>
   )
 }
-
-

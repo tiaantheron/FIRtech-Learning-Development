@@ -9,6 +9,7 @@ export function AccountControls() {
   const [open, setOpen] = useState(false), [username, setUsername] = useState(""), [password, setPassword] = useState(""), [error, setError] = useState("")
   return <div className="border-t border-sidebar-border p-4 text-sm">
     <div className="flex items-center justify-between"><span>{user.Role}</span>{user.Username ? <button disabled={loading} onClick={signOut}>Sign out</button> : <button onClick={() => setOpen(!open)}>Sign in</button>}</div>
+    <p className="mt-2 text-xs text-sidebar-foreground/70">Local workbook role only. No server authentication.</p>
     {open && !user.Username && <form className="mt-3 space-y-2" onSubmit={async e => { e.preventDefault(); setError(""); try { await signIn(username, password); setPassword(""); setOpen(false) } catch(e) { setError((e as Error).message) } }}>
       <input aria-label="Username" autoComplete="username" placeholder="Username" className="w-full rounded bg-background p-2 text-foreground" value={username} onChange={e => setUsername(e.target.value)} />
       <input aria-label="Password" autoComplete="current-password" type="password" placeholder="Password" className="w-full rounded bg-background p-2 text-foreground" value={password} onChange={e => setPassword(e.target.value)} />
@@ -24,7 +25,7 @@ export function UserManagement() {
   const users = accounts(buffer).filter(a => a.Username !== "admin")
   const field = (key: keyof Account, value: string | boolean) => setEditing(editing ? { ...editing, [key]: value } : null)
   return <section className="space-y-4"><h1 className="text-2xl font-semibold">Users and permissions</h1>
-    <p>Accounts are separate from people and business records. Permission changes are saved to the Users worksheet.</p>
+    <p>Local workbook profiles are separate from people and business records. Roles guide this app; they do not secure access to the Excel file. Changes save with the Users worksheet.</p>
     <Button disabled={loading} onClick={() => { setEditing({ Username: "", PasswordHash: "", Role: "Viewer", Departments: "", Active: true, ExportReports: false, ManageUsers: false, ManagePathways: false }); setPassword(""); setError("") }}>Add user</Button>
     {users.map(a => <div className="flex gap-4 rounded border bg-card p-3" key={a.Username}><span>{a.Username} · {a.Role} · {a.Active ? "Active" : "Inactive"}</span><Button variant="outline" onClick={() => { setEditing(a); setPassword(""); setError("") }}>Edit permissions</Button></div>)}
     {editing && <form className="space-y-3 rounded border bg-card p-5" onSubmit={async e => { e.preventDefault(); setError(""); try {
@@ -43,4 +44,3 @@ export function UserManagement() {
     </form>}
   </section>
 }
-

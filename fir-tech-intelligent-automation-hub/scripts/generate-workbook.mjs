@@ -5,6 +5,7 @@ const wb = XLSX.utils.book_new()
 const add = (name, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name)
 
 add("Overview", [
+  { Key: "DataStatus", Value: "Mock/draft demonstration data; not verified business records" },
   { Key: "CompanyName", Value: "FIRtech" },
   { Key: "ResellCurrentLevel", Value: "Gold" },
   { Key: "ResellTargetLevel", Value: "Diamond" },
@@ -133,4 +134,3 @@ mkdirSync("public", { recursive: true })
 const out = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
 writeFileSync(process.argv[2] ?? "public/sample-workbook.xlsx", out)
 console.log("Wrote test/demo workbook")
-

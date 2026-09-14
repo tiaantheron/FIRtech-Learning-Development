@@ -21,7 +21,7 @@ export function exportCSV(rows: ExportRow[], fileName: string) {
     const s = typeof v === "string" && /^[\s]*[=+@\-]/.test(raw) ? "'" + raw : raw
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
-  const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n")
+  const csv = [headers.map(escape).join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n")
   download(new Blob([csv], { type: "text/csv;charset=utf-8;" }), fileName.replace(/\.[a-z]+$/i, "") + ".csv")
 }
 

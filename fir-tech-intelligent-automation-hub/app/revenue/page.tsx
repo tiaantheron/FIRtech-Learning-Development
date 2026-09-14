@@ -74,7 +74,7 @@ export default function RevenuePage() {
         <KpiCard label="Company target (ZAR)" value={formatCurrency(rev.targetZAR)} icon={Target} />
         <KpiCard label="Attained (ZAR)" value={formatCurrency(rev.attainedZAR)} icon={Banknote} tone="success" />
         <KpiCard label="Remaining (ZAR)" value={formatCurrency(rev.remainingZAR)} icon={TrendingUp} tone="warning" />
-        <KpiCard label="UiPath revenue (USD)" value={formatCurrency(rev.attainedUSD, "USD")} icon={Banknote} tone="resell" sublabel="Tracked separately from ZAR" />
+        <KpiCard label="Recorded revenue (USD)" value={formatCurrency(rev.attainedUSD, "USD")} icon={Banknote} tone="resell" sublabel="Tracked separately from ZAR" />
       </section>
 
       <Card className="p-5">
@@ -121,4 +121,3 @@ export default function RevenuePage() {
     </div>
   )
 }
-

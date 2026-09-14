@@ -85,7 +85,7 @@ export default function OverviewPage() {
           <KpiCard
             label="Attainment"
             value={formatPercent(rev.attainmentPct)}
-            sublabel={`UiPath USD attained ${formatCurrency(rev.attainedUSD, "USD")}`}
+            sublabel={`Recorded revenue (USD) ${formatCurrency(rev.attainedUSD, "USD")}`}
             icon={Award}
             tone="resell"
           />
@@ -143,7 +143,7 @@ export default function OverviewPage() {
                 <Stat label="Open opportunities" value={pipe.openOpportunities} />
                 <Stat label="Total pipeline" value={formatCurrency(pipe.totalPipeline)} />
                 <Stat label="Weighted pipeline" value={formatCurrency(pipe.weightedPipeline)} />
-                <Stat label="Won revenue" value={formatCurrency(pipe.wonRevenue)} />
+                <Stat label="Won opportunity value" value={formatCurrency(pipe.wonRevenue)} />
                 <Stat label="Closed opportunity win rate" value={formatPercent(pipe.conversionRate)} />
               </dl>
             </CardContent>
@@ -200,5 +200,3 @@ function Stat({ label, value }: { label: string; value: string | number }) {
     </div>
   )
 }
-
-

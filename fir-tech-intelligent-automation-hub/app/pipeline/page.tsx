@@ -71,7 +71,7 @@ export default function PipelinePage() {
         <KpiCard label="Open opps" value={pipe.openOpportunities} icon={Target} />
         <KpiCard label="Total pipeline" value={formatCurrency(pipe.totalPipeline)} icon={TrendingUp} tone="resell" />
         <KpiCard label="Weighted pipeline" value={formatCurrency(pipe.weightedPipeline)} icon={TrendingUp} tone="resell" />
-        <KpiCard label="Won revenue" value={formatCurrency(pipe.wonRevenue)} icon={CircleCheck} tone="success" />
+        <KpiCard label="Won opportunity value" value={formatCurrency(pipe.wonRevenue)} icon={CircleCheck} tone="success" />
         <KpiCard label="Closed opportunity win rate" value={formatPercent(pipe.conversionRate)} sublabel={`Lost ${formatCurrency(pipe.lostRevenue)}`} icon={TrendingDown} tone="warning" />
       </section>
 
@@ -97,5 +97,3 @@ export default function PipelinePage() {
     </div>
   )
 }
-
-

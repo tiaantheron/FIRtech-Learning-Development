@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/select"
 import { exportCSV, exportExcel, type ExportRow } from "@/lib/services/export"
 
 export default function ReportsPage() {
-  const { filters, user } = useWorkbook()
+  const { filters, user, result } = useWorkbook()
   const canExport = user.Role === "Administrator" || user.ExportReports
   const data = useWorkbookData(false)
   const [employeeId, setEmployeeId] = useState("all")
@@ -36,6 +36,7 @@ export default function ReportsPage() {
     sortValue: (r) => r[h] as string | number,
   }))
 
+  const exportRows = rows.map(row => ({ ...row, "Source status": result?.data?.overview.find(s => s.key === "DataStatus")?.value || "Not supplied" }))
   const fileBase = `firtech-${active.id}`
 
   return (
@@ -73,10 +74,10 @@ export default function ReportsPage() {
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" disabled={!canExport} onClick={() => { if (canExport) window.print() }}><Printer className="h-4 w-4" />Print</Button>
-                <Button variant="outline" size="sm" onClick={() => { if (canExport) exportCSV(rows, fileBase) }} disabled={!canExport || rows.length === 0}>
+                <Button variant="outline" size="sm" onClick={() => { if (canExport) exportCSV(exportRows, fileBase) }} disabled={!canExport || rows.length === 0}>
                   <FileDown className="h-4 w-4" /> CSV
                 </Button>
-                <Button size="sm" onClick={() => { if (canExport) exportExcel(rows, fileBase, active.name) }} disabled={!canExport || rows.length === 0}>
+                <Button size="sm" onClick={() => { if (canExport) exportExcel(exportRows, fileBase, active.name) }} disabled={!canExport || rows.length === 0}>
                   <FileSpreadsheet className="h-4 w-4" /> Excel
                 </Button>
               </div>
@@ -94,6 +95,3 @@ export default function ReportsPage() {
     </div>
   )
 }
-
-
-

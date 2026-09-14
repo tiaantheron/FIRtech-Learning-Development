@@ -1,0 +1,46 @@
+✔ delivery gate: add, edit, validate, export/reload and undo preserve stable IDs and audit (828.6469ms)
+✔ default source has labelled draft data and empty detailed source sheets with usable headers (19.1549ms)
+✔ learning states distinguish outstanding, overdue, expired and expiring (6.3021ms)
+✔ edited foreign transaction retains original amount and documents ZAR conversion (194.293ms)
+✔ incomplete conversions are rejected without altering the input workbook (57.073ms)
+✔ add and remove records round-trip through Excel with no phantom blank records (100.1385ms)
+✔ renaming follows references and archiving retains a linked employee and their history (145.0683ms)
+✔ creating detailed revenue records extends reference workbook and updates ZAR totals (31.2681ms)
+✔ reference cell styles survive edits, audit is appended, derived remaining is updated (58.6751ms)
+✔ source saves successive edits and undo, rejecting stale copies and lost permissions (3.5321ms)
+✔ locked files and write/close failures retain the source and allow retry (1.2768ms)
+✔ guest is read-only, contributors cannot cross departments or edit configuration (15.4017ms)
+✔ built-in account authenticates from the source and is absent from business records (635.1412ms)
+✔ user permissions round-trip and audit omits password hashes (194.6846ms)
+✔ evidence round-trips with notes and is excluded from ordinary data sheets (53.1343ms)
+✔ report exports preserve selected rows, numeric types and escaped CSV content (87.0287ms)
+✔ unique PS recognises source UniqueCustomer flag without counting unqualified engagements (47.747ms)
+✔ save rejects invalid allocation, including small deviations, and excludes archived departments (12.2578ms)
+✔ audit is created when absent and cannot be edited through the mutation API (634.7247ms)
+✔ completed training needs a date and the reference editor can record it (105.1281ms)
+✔ gap and additional reports respect their advertised subsets (5.0265ms)
+✔ large tables initially render 25 rows rather than the entire workbook (20.9291ms)
+✔ sample parses all 14 worksheets and preserves supplied totals (27.1136ms)
+✔ malformed numbers, currency, dates and duplicate IDs block calculations (63.3953ms)
+✔ explicit 1% is one percent, invalid booleans are errors (21.6289ms)
+✔ USD pipeline never contributes to ZAR and closed stages override probability (6.7021ms)
+✔ expired certificates require a positive explicit override (3.8346ms)
+✔ memberships filter training without duplicating employees (4.6129ms)
+✔ revenue attributes to owner once and reports respect period (5.6419ms)
+✔ employee report filtering applies to exports and requirement overrides are explicit (4.4978ms)
+✔ missing sheets report structural errors instead of returning partial dashboards (11.6826ms)
+✔ physical row numbers survive blank rows (13.9413ms)
+✔ invalid overrides and duplicate revenue block import (28.5244ms)
+✔ department engagement attribution never repeats the company total (9.9086ms)
+✔ user reference imports with exact pathway totals and memberships (20.965ms)
+✔ reference validation points to original source sheet and physical row (25.0347ms)
+✔ reference missing columns are errors and the default currency is ZAR (29.575ms)
+✔ missing numeric cells default to zero and optional text stays blank (44.8683ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1466.6252

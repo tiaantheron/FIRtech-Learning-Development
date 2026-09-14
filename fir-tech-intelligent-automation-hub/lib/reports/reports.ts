@@ -43,7 +43,7 @@ const definitions: ReportDef[] = [
         { Metric: "Resell readiness", Value: pct(resell.progress), Detail: `${resell.achieved}/${resell.total} achieved` },
         { Metric: "Services readiness", Value: pct(services.progress), Detail: `${services.achieved}/${services.total} achieved` },
         { Metric: "Revenue attainment (ZAR)", Value: pct(rev.attainmentPct), Detail: `${money(rev.attainedZAR)} of ${money(rev.targetZAR)}` },
-        { Metric: "UiPath revenue (USD)", Value: money(rev.attainedUSD, "USD"), Detail: "Tracked separately" },
+        { Metric: "Recorded revenue (USD)", Value: money(rev.attainedUSD, "USD"), Detail: "Tracked separately" },
         { Metric: "Training completion", Value: pct(training.completionRate), Detail: `${training.outstanding} outstanding` },
         { Metric: "Qualifying engagements", Value: eng.qualifying, Detail: `${eng.uniqueProfessionalServices} unique PS` },
       ]
@@ -212,5 +212,3 @@ function pct(v: number): string {
 function money(v: number, currency = "ZAR"): string {
   return `${currency} ${Math.round(v || 0).toLocaleString()}`
 }
-
-

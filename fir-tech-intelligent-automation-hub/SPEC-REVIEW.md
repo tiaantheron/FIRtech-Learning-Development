@@ -1,5 +1,7 @@
 # Original specification review — 10 September 2026
 
+> Historical assessment. See QA-CHECKLIST.md for the 11 September delivery state. Local workbook roles, detailed sheet headers and audit-preserving undo have since been added; authenticated identities and server-side security remain unimplemented.
+
 ## Conclusion and scope
 
 Reviewed `C:/Users/tiaan/Downloads/Spec - Dashboard.docx` (the original Product Requirements Document), the current React source, the supplied `public/firtech_dashboard.xlsx`, and automated tests.
@@ -88,5 +90,3 @@ Regression tests cover imports, financial calculations, editing/export round tri
 5. Perform representative UAT, security/performance checks and a backup/restore exercise before production acceptance.
 
 Verification result: all 30 automated tests passed; the final TypeScript check passed. The local preview responded with HTTP 200. The final production build passed (Vite reported a non-blocking bundle-size warning).
-
-

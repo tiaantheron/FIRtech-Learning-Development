@@ -47,6 +47,7 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
   if (!view.headers.length) throw new Error("No worksheet format is available.")
   const original = rowNumber ? view.rows.find(r => r.row === rowNumber)?.values : undefined
   if (rowNumber && !original) throw new Error("This entry no longer exists. Reopen the editor.")
+  if (original && values[view.headers[0]] !== original[view.headers[0]]) throw new Error("Record IDs/keys are immutable. Edit the record fields instead.")
   if (sheetName === "Users") {
     if (String(original?.Username ?? "").toLowerCase() === "admin" || String(values.Username ?? "").toLowerCase() === "admin") throw new Error("The built-in account cannot be modified.")
     if (action !== "delete") {
@@ -107,3 +108,19 @@ export async function mutateWorkbook(buffer: ArrayBuffer, sheetName: string, row
 }
 
 
+
+/** Restore business data without deleting the history of the action being undone. */
+export async function undoWorkbook(previous: ArrayBuffer, current: ArrayBuffer, actor: string) {
+  const { default: ExcelJS } = await import("exceljs")
+  const restored = new ExcelJS.Workbook(), latest = new ExcelJS.Workbook()
+  await restored.xlsx.load(previous); await latest.xlsx.load(current)
+  const oldAudit = restored.getWorksheet("Audit")
+  if (oldAudit) restored.removeWorksheet(oldAudit.id)
+  const audit = restored.addWorksheet("Audit")
+  const latestAudit = latest.getWorksheet("Audit")
+  if (latestAudit) audit.model = structuredClone(latestAudit.model)
+  else audit.addRow(["AuditID", "Timestamp", "User", "RecordType", "RecordID", "Action", "PreviousValue", "NewValue", "Reason"])
+  audit.addRow([`AUD-${crypto.randomUUID()}`, new Date().toISOString(), actor, "Workbook", "Workbook", "Undo", "Current business data", "Previous business data restored", "Undo last change; earlier audit entries retained"])
+  restored.calcProperties.fullCalcOnLoad = true
+  return new Uint8Array(await restored.xlsx.writeBuffer()).buffer as ArrayBuffer
+}

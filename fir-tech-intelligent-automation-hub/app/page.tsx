@@ -18,6 +18,7 @@ import { KpiCard } from "@/components/kpi-card"
 import { PathwayCard } from "@/components/pathway-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { MonetaryConfiguration } from "@/components/monetary-configuration"
 import { DonutChart } from "@/components/charts"
 import {
   certMetrics,
@@ -100,6 +101,7 @@ export default function OverviewPage() {
           <Progress value={rev.attainmentPct} tone="resell" className="mt-3 h-3" />
         </Card>
       </section>
+      <MonetaryConfiguration />
 
       {/* Training + Pipeline + Engagements grid */}
       <section className="grid gap-6 xl:grid-cols-3">

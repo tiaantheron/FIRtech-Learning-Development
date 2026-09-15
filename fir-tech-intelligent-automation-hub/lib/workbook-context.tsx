@@ -20,6 +20,7 @@ interface WorkbookContextValue {
   loadFromFile: (file: File) => Promise<void>; openSource: () => Promise<void>; reconnect: () => Promise<void>; forgetSource: () => Promise<void>
   exportWorkbook: () => Promise<void>; refresh: () => Promise<void>; clear: () => void; undo: () => Promise<void>
   editRecord: (sheet: string, row: number | null, values: Record<string, CellValue>, action: "save" | "delete") => Promise<void>
+  editRecords: (edits: { sheet: string; row: number | null; values: Record<string, CellValue>; action: "save" | "delete" }[]) => Promise<void>
 }
 const WorkbookContext = createContext<WorkbookContextValue | null>(null)
 export function WorkbookProvider({ children }: { children: React.ReactNode }) {
@@ -147,6 +148,20 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
       await persist(next, parsed)
     } finally { busy.current = false; setLoading(false) }
   }
+  async function editRecords(edits: { sheet: string; row: number | null; values: Record<string, CellValue>; action: "save" | "delete" }[]) {
+    if (!buffer || !result || busy.current) throw new Error("Workbook is busy. Please try again.")
+    for (const edit of edits) assertEdit(user, result.data!, edit.sheet, edit.row ? readEditorSheet(buffer, edit.sheet).rows.find(r => r.row === edit.row)?.values : undefined, edit.values, edit.action)
+    busy.current = true; setLoading(true); setError(null)
+    try {
+      let next = buffer
+      const actor = user.Username === "admin" ? "System administrator" : user.Username
+      for (const edit of edits) next = await mutateWorkbook(next, edit.sheet, edit.row, edit.values, edit.action, actor)
+      const parsed = parseWorkbook(next, result.fileName)
+      history.current = [...history.current.slice(-19), buffer]
+      setBuffer(next); setResult(parsed); setDirty(true)
+      await persist(next, parsed)
+    } finally { busy.current = false; setLoading(false) }
+  }
   async function undo() {
     requireAdmin()
     if (!result || !buffer || !history.current.length) return
@@ -189,7 +204,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     handle.current = null; saved.current = null; history.current = []
     setConnected(false); setBuffer(null); setResult(null); setError(null); setNotice(null); setDirty(false); setFilters(EMPTY_FILTERS)
   }
-  return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, undo }}>{children}</WorkbookContext.Provider>
+  return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, editRecords, undo }}>{children}</WorkbookContext.Provider>
 }
 export function useWorkbook() {
   const ctx = useContext(WorkbookContext)

@@ -72,7 +72,7 @@ export default function PeoplePage() {
     <div className="space-y-6">
       <PageHeader
         title="People"
-        description="Single source of employee records. A person may belong to multiple departments without duplication."
+        description="Single source of employee records. A person may belong to multiple departments."
         actions={
           <div className="flex flex-wrap gap-2">
             <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} aria-label="Filter by department">

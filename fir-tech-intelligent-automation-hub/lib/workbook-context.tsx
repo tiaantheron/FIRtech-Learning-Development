@@ -10,6 +10,7 @@ import { mutateWorkbook, undoWorkbook, type CellValue } from "@/lib/services/wor
 import { EMPTY_FILTERS, type Filters } from "@/lib/calculations/metrics"
 import { assertWorkbookSaveable } from "@/lib/services/save-checks"
 import { sourcePicker, excelTypes, rememberedSource, writeSource, type WorkbookHandle } from "@/lib/services/file-connection"
+import { readCloudWorkbook, writeCloudWorkbook } from "@/lib/services/cloud-workbook"
 
 interface WorkbookContextValue {
   user: Account; signIn: (username: string, password: string) => Promise<void>; signOut: () => void
@@ -35,11 +36,13 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [sourceRevision, setSourceRevision] = useState(0)
   const [connected, setConnected] = useState(false)
+  const [cloudConnected, setCloudConnected] = useState(false)
   const [rememberedName, setRememberedName] = useState<string | null>(null)
   const history = useRef<ArrayBuffer[]>([])
   const handle = useRef<WorkbookHandle | null>(null)
   const remembered = useRef<WorkbookHandle | null>(null)
   const saved = useRef<ArrayBuffer | null>(null)
+  const cloudEtag = useRef<string | null>(null)
   const busy = useRef(false)
   const interacted = useRef(false)
   const user = useMemo(() => buffer && session.Username ? accounts(buffer).find(a => a.Username === session.Username && a.Active && a.PasswordHash === session.PasswordHash) ?? GUEST : GUEST, [buffer, session])
@@ -77,7 +80,16 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch("/firtech_dashboard.xlsx", { cache: "no-store" }).then(async response => {
+    readCloudWorkbook().then(async cloud => {
+      if (cancelled || interacted.current) return
+      if (cloud) {
+        cloudEtag.current = cloud.etag
+        await install(new File([cloud.bytes], "firtech_dashboard.xlsx"), null)
+        setCloudConnected(true); setConnected(true)
+        setNotice("Connected to the shared Excel workbook.")
+        return
+      }
+      const response = await fetch("/firtech_dashboard.xlsx", { cache: "no-store" })
       if (!response.ok) throw new Error("Could not load the default Excel workbook. Replace the workbook to continue.")
       const bytes = await response.arrayBuffer()
       if (!cancelled && !interacted.current) await install(new File([bytes], "firtech_dashboard.xlsx"), null)
@@ -97,7 +109,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     if (buffer) requireAdmin()
     interacted.current = true
     if (!canReplace()) return
-    await run(async () => { await install(file, null); await remember(null) })
+    await run(async () => { await install(file, null); setCloudConnected(false); cloudEtag.current = null; await remember(null) })
   }
   async function openSource() {
     if (buffer) requireAdmin()
@@ -108,7 +120,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
       if (!picker) throw new Error("Use the file upload control in this browser.")
       const [connection] = await picker.call(window, { multiple: false, types: excelTypes })
       if (await connection.requestPermission({ mode: "readwrite" }) !== "granted") throw new Error("Write access was not granted. Choose the file again and allow editing to enable automatic saves.")
-      await install(await connection.getFile(), connection); await remember(connection)
+      await install(await connection.getFile(), connection); setCloudConnected(false); cloudEtag.current = null; await remember(connection)
     })
   }
   async function reconnect() {
@@ -118,21 +130,24 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     await run(async () => {
       const connection = remembered.current!
       if (await connection.requestPermission({ mode: "readwrite" }) !== "granted") throw new Error("Allow file access to reconnect your workbook.")
-      await install(await connection.getFile(), connection)
+      await install(await connection.getFile(), connection); setCloudConnected(false); cloudEtag.current = null
     })
   }
   async function forgetSource() {
     requireAdmin()
     if (busy.current) return
+    if (cloudConnected) { setNotice("The shared Excel workbook stays connected."); return }
     interacted.current = true; handle.current = null; setConnected(false)
     setNotice("File connection forgotten. Use Download Excel to keep any further edits.")
     await remember(null)
   }
   async function persist(next: ArrayBuffer, parsed: ParseResult) {
-    if (!handle.current || !saved.current) { setNotice("Changes are in this tab. Download Excel to keep them."); return }
+    if (!saved.current) { setNotice("Changes are in this tab. Download Excel to keep them."); return }
     try {
       assertWorkbookSaveable(parsed)
-      await writeSource(handle.current, saved.current, next)
+      if (handle.current) await writeSource(handle.current, saved.current, next)
+      else if (cloudConnected) cloudEtag.current = await writeCloudWorkbook(next, cloudEtag.current)
+      else { setNotice("Changes are in this tab. Download Excel to keep them."); return }
       saved.current = next; setDirty(false); setNotice(`Saved automatically to ${parsed.fileName} at ${new Date().toLocaleTimeString()}.`)
     } catch (e) { setNotice(null); setError(`Not saved: ${message(e)}`) }
   }
@@ -177,8 +192,8 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     if (!buffer || !result) return
     await run(async () => {
       assertWorkbookSaveable(result)
-      if (handle.current) {
-        if (await handle.current.requestPermission({ mode: "readwrite" }) !== "granted") throw new Error("File access was denied. Your edits remain unsaved.")
+      if (handle.current || cloudConnected) {
+        if (handle.current && await handle.current.requestPermission({ mode: "readwrite" }) !== "granted") throw new Error("File access was denied. Your edits remain unsaved.")
         await persist(buffer, result)
       } else {
         download(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), result.fileName.replace(/\.xlsx$/i, "-updated.xlsx"))
@@ -193,6 +208,17 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     saved.current = buffer; setDirty(false); setDownloaded(null); setNotice("Download confirmed by you. Keep that file to reload these records and their audit history.")
   }
   async function refresh() {
+    if (cloudConnected) {
+      if (!canReplace()) return
+      await run(async () => {
+        const cloud = await readCloudWorkbook()
+        if (!cloud) throw new Error("The shared Excel workbook has not been set up yet.")
+        cloudEtag.current = cloud.etag
+        await install(new File([cloud.bytes], "firtech_dashboard.xlsx"), null)
+        setCloudConnected(true); setConnected(true)
+      })
+      return
+    }
     if (handle.current) {
       if (!canReplace()) return
       await run(async () => { await install(await handle.current!.getFile(), handle.current) })
@@ -202,7 +228,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     requireAdmin()
     if (!canReplace()) return
     handle.current = null; saved.current = null; history.current = []
-    setConnected(false); setBuffer(null); setResult(null); setError(null); setNotice(null); setDirty(false); setFilters(EMPTY_FILTERS)
+    cloudEtag.current = null; setCloudConnected(false); setConnected(false); setBuffer(null); setResult(null); setError(null); setNotice(null); setDirty(false); setFilters(EMPTY_FILTERS)
   }
   return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, editRecords, undo }}>{children}</WorkbookContext.Provider>
 }

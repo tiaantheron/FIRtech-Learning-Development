@@ -37,9 +37,11 @@ export function MonetaryConfiguration() {
 
   if (user.Role !== "Administrator" || !view || !valueColumn || !departments) return null
 
+  const departmentRows = departments.rows
+  const departmentHeaders = departments.headers
   const settingRow = (key: string) => view.rows.find(row => String(row.values[keyColumn]) === key)
   const setAmount = (key: string, value: string) => setAmounts(current => ({ ...current, [key]: value }))
-  const amountKeys = ["companyZAR", "companyUSD", ...departments.rows.map(row => `department:${row.row}`)]
+  const amountKeys = ["companyZAR", "companyUSD", ...departmentRows.map(row => `department:${row.row}`)]
   const valid = amountKeys.every(key => {
     const value = amounts[key] ?? ""
     return value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0
@@ -55,8 +57,8 @@ export function MonetaryConfiguration() {
         const values = row ? { ...row.values, [valueColumn]: amounts[key] } : { [keyColumn]: settingName, [valueColumn]: amounts[key] }
         edits.push({ sheet, row: row?.row ?? null, values, action: "save" })
       }
-      for (const row of departments.rows) {
-        const targetColumn = departments.headers.includes("RevenueTargetZAR") ? "RevenueTargetZAR" : "RevenueTarget"
+      for (const row of departmentRows) {
+        const targetColumn = departmentHeaders.includes("RevenueTargetZAR") ? "RevenueTargetZAR" : "RevenueTarget"
         edits.push({ sheet: "Departments", row: row.row, values: { ...row.values, [targetColumn]: Number(amounts[`department:${row.row}`]) }, action: "save" })
       }
       await editRecords(edits)

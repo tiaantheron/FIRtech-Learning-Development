@@ -1,6 +1,6 @@
 # FIRtech Intelligent Automation Hub
 
-A Phase 1, browser-only React + TypeScript application. Excel is the authoritative business record. No database, server authentication service or cloud service is used. Optional workbook-based sign-in governs application actions; this is not a server-enforced security boundary.
+A React + TypeScript application. Excel is the authoritative business record. It can run in browser-only mode, or on Vercel with one shared workbook stored in Vercel Blob. Optional workbook-based sign-in governs application actions; this is not a server-enforced security boundary.
 
 ## Run locally
 
@@ -15,7 +15,9 @@ Open the local address printed by Vite. `pnpm build` type-checks and builds the 
 
 ## Workbook workflow
 
-The dashboard automatically loads `/firtech_dashboard.xlsx` (the reference in `public/`) on startup. Excel remains the dataset source. Use **Replace workbook** to browse any folder or accessible drive; the replacement must match the reference layout or the supported detailed format. Invalid replacements leave the current workbook intact. The bundled default is served read-only: connect a local workbook to enable automatic source writes, or download edits. Where the browser exposes the File System Access API, allow read/write access: each applied edit, addition, removal or undo automatically saves to that same source file. Intermediate form typing is not saved. Invalid changes are rejected; allocation changes remain pending until active allocations total 100%. The app serializes writes and indicates pending changes or save failures. File locks, revoked access and changed source bytes stop saving without intentionally overwriting the newer file. Close Excel if it holds a lock, then use **Save Excel** to retry. This byte comparison is not an atomic multi-user lock.
+The dashboard loads the shared workbook from `/api/workbook` when a Vercel Blob store is connected. If it has not yet been created, it loads `/firtech_dashboard.xlsx` from `public/` as a starter. The first successful edit saves that starter as the shared workbook. Each applied edit, addition, removal or undo then saves to the shared workbook automatically. The service uses the workbook revision to reject a save when somebody else has already changed it; refresh and apply the edit again. A workbook larger than 4.5 MB needs a direct-to-storage upload route before it can use this server save path.
+
+To enable shared saving on Vercel, set the Vercel project Root Directory to `fir-tech-intelligent-automation-hub`, then open **Storage**, create a **private Blob** store and connect it to the project in Production and Preview. Vercel supplies the required storage credentials to the deployment. Redeploy after connecting the store. The Blob file is kept at `firtech/firtech_dashboard.xlsx`; the first save creates it. The shared endpoint currently inherits the app's workbook-based permission model, which is enforced in the browser. Add server-enforced identity before using it for confidential multi-user data.
 
 The browser remembers the file handle in IndexedDB, without storing workbook contents or a raw path. On the next visit, **Reconnect workbook** requests access and reads the current source. Access is specific to this browser profile and application origin; moving the file, clearing browser data or changing the local server address can require selection again. **Forget file** removes the remembered connection and switches the current workbook to download mode. Business data stays in memory until written to Excel.
 

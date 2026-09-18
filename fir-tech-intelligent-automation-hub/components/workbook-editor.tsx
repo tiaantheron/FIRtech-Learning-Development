@@ -10,8 +10,8 @@ import { DataTable } from "./data-table"
 const routeSheets: Record<string, string[]> = {
   "/": ["Settings", "Overview", "Departments", "Requirements", "ResellRequirements", "ServicesRequirements", "ReportingPeriods"],
   "/departments": ["Departments", "Memberships", "DepartmentMemberships"], "/people": ["People", "Memberships", "DepartmentMemberships"],
-  "/training": ["Training", "TrainingAssignments", "Certifications"], "/pipeline": ["Opportunities", "Leads"], "/revenue": ["Revenue"],
-  "/engagements": ["Engagements"], "/pathways": ["Requirements", "ResellRequirements", "ServicesRequirements", "Overrides"],
+  "/courses": ["Training", "TrainingAssignments", "Certifications"], "/pipeline": ["Opportunities", "Leads"], "/revenue": ["Revenue"],
+  "/pathways": ["Requirements", "ResellRequirements", "ServicesRequirements", "Overrides"],
 }
 export function WorkbookEditor({ route }: { route: string }) {
   const { buffer, editRecord, loading, connected, user, result } = useWorkbook()

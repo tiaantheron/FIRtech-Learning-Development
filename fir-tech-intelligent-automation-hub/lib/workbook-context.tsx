@@ -18,6 +18,7 @@ interface WorkbookContextValue {
   downloadPending: boolean; confirmDownload: () => void
   sourceRevision: number; connected: boolean; rememberedName: string | null
   filters: Filters; setFilters: (f: Filters) => void
+  displayCurrency: "source" | "ZAR"; setDisplayCurrency: (currency: "source" | "ZAR") => void
   loadFromFile: (file: File) => Promise<void>; openSource: () => Promise<void>; reconnect: () => Promise<void>; forgetSource: () => Promise<void>
   exportWorkbook: () => Promise<void>; refresh: () => Promise<void>; clear: () => void; undo: () => Promise<void>
   editRecord: (sheet: string, row: number | null, values: Record<string, CellValue>, action: "save" | "delete") => Promise<void>
@@ -34,6 +35,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  const [displayCurrency, setDisplayCurrency] = useState<"source" | "ZAR">("source")
   const [sourceRevision, setSourceRevision] = useState(0)
   const [connected, setConnected] = useState(false)
   const [cloudConnected, setCloudConnected] = useState(false)
@@ -230,7 +232,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     handle.current = null; saved.current = null; history.current = []
     cloudEtag.current = null; setCloudConnected(false); setConnected(false); setBuffer(null); setResult(null); setError(null); setNotice(null); setDirty(false); setFilters(EMPTY_FILTERS)
   }
-  return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, editRecords, undo }}>{children}</WorkbookContext.Provider>
+  return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, displayCurrency, setDisplayCurrency, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, editRecords, undo }}>{children}</WorkbookContext.Provider>
 }
 export function useWorkbook() {
   const ctx = useContext(WorkbookContext)

@@ -11,7 +11,6 @@ import {
   GraduationCap,
   Target,
   Banknote,
-  Handshake,
   Route,
   FileText,
   ShieldAlert,
@@ -40,10 +39,9 @@ const NAV: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/departments", label: "Departments", icon: Building2 },
   { href: "/people", label: "People", icon: Users },
-  { href: "/training", label: "Training & Certs", icon: GraduationCap },
+  { href: "/courses", label: "Courses", icon: GraduationCap },
   { href: "/pipeline", label: "Leads & Opportunities", icon: Target },
   { href: "/revenue", label: "Revenue", icon: Banknote },
-  { href: "/engagements", label: "Engagements", icon: Handshake },
   { href: "/pathways", label: "Partner Pathways", icon: Route },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/users", label: "Users & permissions", icon: Users },
@@ -177,7 +175,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <FileDown className="mb-4 h-9 w-9 text-primary" />
             <h1 id="open-workbook-title" className="text-2xl font-semibold">Replace the Excel workbook</h1>
             <p className="mt-3 max-w-2xl text-muted-foreground">The FIRtech reference workbook loads by default and establishes the worksheet format. Replace it with a workbook using that layout or the supported detailed 14-sheet format. Incompatible files are rejected without replacing the current dashboard.</p>
-            <p className="my-5 text-sm text-muted-foreground">Reporting defaults to South African rand (ZAR). Original transaction currencies are retained.</p>
+              <p className="my-5 text-sm text-muted-foreground">Amounts display in their original workbook currencies by default. Use All in Rand to see values with documented ZAR conversions.</p>
             <div className="flex flex-wrap items-center gap-4"><Button disabled={loading || (!!result && user.Role !== "Administrator")} onClick={() => { if (sourcePicker()) { void openSource(); setImportOpen(false) } else fileInput.current?.click() }}><Upload className="h-4 w-4" />Connect Excel file</Button><Button variant="outline" disabled={loading || (!!result && user.Role !== "Administrator")} onClick={() => fileInput.current?.click()}>Import a copy</Button>{user.Role === "Administrator" && <a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>}{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
             <p className="mt-5 text-sm text-muted-foreground">With direct file access, applied edits save automatically to the chosen source workbook. Your browser remembers the connection for next time. Otherwise, download your edited workbook. Reports exports filtered tables separately.</p>
           </section>}

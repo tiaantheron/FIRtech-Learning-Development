@@ -3,8 +3,8 @@
 import { useWorkbook, useWorkbookData } from "@/lib/workbook-context"
 import { Select } from "@/components/ui/select"
 
-export function GlobalFilters() {
-  const { filters, setFilters } = useWorkbook()
+export function GlobalFilters({ currency = false }: { currency?: boolean }) {
+  const { filters, setFilters, displayCurrency, setDisplayCurrency } = useWorkbook()
   const data = useWorkbookData(false)
   if (!data) return null
 
@@ -42,6 +42,13 @@ export function GlobalFilters() {
           </option>
         ))}
       </Select>
+      {currency && <>
+        <label className="sr-only" htmlFor="currency-filter">Currency view</label>
+        <Select id="currency-filter" value={displayCurrency} onChange={event => setDisplayCurrency(event.target.value as "source" | "ZAR")}>
+          <option value="source">Original currencies</option>
+          <option value="ZAR">All in Rand (ZAR)</option>
+        </Select>
+      </>}
     </div>
   )
 }

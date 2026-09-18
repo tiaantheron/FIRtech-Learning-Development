@@ -9,6 +9,9 @@ export async function readCloudWorkbook(): Promise<CloudWorkbook | null> {
   const response = await fetch("/api/workbook", { cache: "no-store" })
   if (response.status === 404) return null
   if (!response.ok) throw new Error("Could not load the shared Excel workbook.")
+  // Local Vite serves api/workbook.ts as a JavaScript module. Only a real workbook
+  // response should override the bundled default file.
+  if (!(response.headers.get("content-type") ?? "").toLowerCase().includes(XLSX)) return null
   const etag = response.headers.get("etag")
   if (!etag) throw new Error("The shared workbook response did not include a revision.")
   return { bytes: await response.arrayBuffer(), etag }

@@ -226,8 +226,8 @@ export function revenueMetrics(data: WorkbookData, filters = EMPTY_FILTERS): Rev
 
   let targetZAR = 0
   if (filters.departmentId === "all") {
-    const overviewTarget = Number(getSetting(data, "CompanyRevenueTargetZAR", "0"))
-    targetZAR = overviewTarget || data.departments.reduce((s, d) => s + d.revenueTargetZAR, 0)
+    const overviewTarget = data.overview.find(setting => setting.key === "CompanyRevenueTargetZAR")
+    targetZAR = overviewTarget ? Number(overviewTarget.value) : data.departments.reduce((s, d) => s + d.revenueTargetZAR, 0)
   } else {
     targetZAR = data.departments.find((d) => d.departmentId === filters.departmentId)?.revenueTargetZAR ?? 0
   }

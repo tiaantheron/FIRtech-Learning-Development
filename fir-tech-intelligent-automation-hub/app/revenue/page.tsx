@@ -13,15 +13,18 @@ import { Badge } from "@/components/ui/badge"
 import { departmentName, revenueMetrics } from "@/lib/calculations/metrics"
 import { formatCurrency, formatPercent } from "@/lib/utils/format"
 import type { RevenueRecord } from "@/lib/models/types"
-import { reportingAmount } from "@/lib/calculations/currency"
+import { amountInRand, displayAmount, originalCurrencyTotals, reportingAmount } from "@/lib/calculations/currency"
 import { CurrencyDetails } from "@/components/currency-details"
 
 export default function RevenuePage() {
-  const { filters } = useWorkbook()
+  const { filters, displayCurrency } = useWorkbook()
   const data = useWorkbookData()
   if (!data) return <p className="text-sm text-muted-foreground">No workbook data available.</p>
 
   const rev = revenueMetrics(data, filters)
+  const originalRevenue = originalCurrencyTotals(data.revenue, record => record.amount)
+  const usdTarget = data.overview.find(setting => setting.key === "CompanyRevenueTargetUSD")?.value
+  const unconverted = data.revenue.filter(record => amountInRand(record.amount, record) === null).length
 
   const deptRevenue = data.departments.map((d) => {
     const attained = data.revenue
@@ -46,13 +49,14 @@ export default function RevenuePage() {
     { key: "exchangeRateSource", header: "Rate source" },
     {
       key: "amount",
-      header: "Original amount",
+      header: displayCurrency === "source" ? "Original amount" : "Amount (ZAR)",
       align: "right",
       sortable: true,
+      sortValue: r => displayCurrency === "source" ? r.amount : amountInRand(r.amount, r) ?? -1,
       render: (r) => (
         <span className="flex items-center justify-end gap-2">
-          {formatCurrency(r.amount, r.currency)}
-          <Badge variant={r.currency === "USD" ? "resell" : "muted"}>{r.currency}</Badge>
+          {displayAmount(r.amount, r, displayCurrency)}
+          {displayCurrency === "ZAR" && <Badge variant={r.currency === "USD" ? "resell" : "muted"}>from {r.currency}</Badge>}
         </span>
       ),
     },
@@ -66,18 +70,22 @@ export default function RevenuePage() {
     <div className="space-y-8">
       <PageHeader
         title="Revenue"
-        description="Company and departmental revenue. Only the owning department is counted to prevent double counting; UiPath USD and internal ZAR are tracked separately."
-        actions={<GlobalFilters />}
+        description="Company and departmental revenue. Only the owning department is counted to prevent double counting; original currencies stay separate until converted to Rand."
+        actions={<GlobalFilters currency />}
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Company target (ZAR)" value={formatCurrency(rev.targetZAR)} icon={Target} />
-        <KpiCard label="Attained (ZAR)" value={formatCurrency(rev.attainedZAR)} icon={Banknote} tone="success" />
-        <KpiCard label="Remaining (ZAR)" value={formatCurrency(rev.remainingZAR)} icon={TrendingUp} tone="warning" />
-        <KpiCard label="Recorded revenue (USD)" value={formatCurrency(rev.attainedUSD, "USD")} icon={Banknote} tone="resell" sublabel="Tracked separately from ZAR" />
+        {displayCurrency === "source" && usdTarget !== undefined && usdTarget !== "" && <KpiCard label="Company target (USD)" value={formatCurrency(Number(usdTarget), "USD")} icon={Target} />}
+        {displayCurrency === "source" ? originalRevenue.map(total => <KpiCard key={total.currency} label={`Recorded (${total.currency})`} value={formatCurrency(total.value, total.currency)} icon={Banknote} tone="success" />) : <>
+          <KpiCard label="Attained (ZAR)" value={formatCurrency(rev.attainedZAR)} icon={Banknote} tone="success" />
+          <KpiCard label="Remaining (ZAR)" value={formatCurrency(rev.remainingZAR)} icon={TrendingUp} tone="warning" />
+        </>}
       </section>
+      {displayCurrency === "source" && <p className="text-sm text-muted-foreground">Recorded amounts retain their original currencies. Select All in Rand to compare them with the ZAR target; currencies are never added together in this view.</p>}
+      {displayCurrency === "ZAR" && unconverted > 0 && <p className="text-sm text-warning">{unconverted} revenue record{unconverted === 1 ? " has" : "s have"} no documented ZAR conversion and {unconverted === 1 ? "is" : "are"} excluded from Rand totals.</p>}
 
-      <Card className="p-5">
+      {displayCurrency === "ZAR" && <Card className="p-5">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">ZAR attainment ({formatPercent(rev.attainmentPct)})</span>
           <span className="tabular-nums text-muted-foreground">
@@ -85,21 +93,21 @@ export default function RevenuePage() {
           </span>
         </div>
         <Progress value={rev.attainmentPct} tone="resell" className="mt-3 h-3" />
-      </Card>
+      </Card>}
 
       <section className="space-y-3">
-        <RevenueHistory />
+        {displayCurrency === "ZAR" && <RevenueHistory />}
         <SectionHeading title="Department Revenue Targets (ZAR)" tone="resell" />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {deptRevenue.map((d) => (
             <Card key={d.departmentId} className="p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">{d.name}</span>
-                <span className="text-xs text-muted-foreground">{formatPercent(d.pct)}</span>
+                {displayCurrency === "ZAR" && <span className="text-xs text-muted-foreground">{formatPercent(d.pct)}</span>}
               </div>
-              <Progress value={d.pct} tone="resell" className="mt-2" />
+              {displayCurrency === "ZAR" && <Progress value={d.pct} tone="resell" className="mt-2" />}
               <p className="mt-1 text-xs text-muted-foreground">
-                {formatCurrency(d.attained)} / {formatCurrency(d.target)}
+                {displayCurrency === "ZAR" ? `${formatCurrency(d.attained)} / ${formatCurrency(d.target)}` : `${originalCurrencyTotals(data.revenue.filter(record => record.ownerDepartmentId === d.departmentId), record => record.amount).map(total => formatCurrency(total.value, total.currency)).join(" · ") || "No records"} recorded · ${formatCurrency(d.target)} ZAR target`}
               </p>
             </Card>
           ))}

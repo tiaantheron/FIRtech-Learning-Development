@@ -16,7 +16,7 @@ interface WorkbookContextValue {
   user: Account; signIn: (username: string, password: string) => Promise<void>; signOut: () => void
   result: ParseResult | null; buffer: ArrayBuffer | null; dirty: boolean; canUndo: boolean; loading: boolean; error: string | null; notice: string | null
   downloadPending: boolean; confirmDownload: () => void
-  sourceRevision: number; connected: boolean; rememberedName: string | null
+  sourceRevision: number; connected: boolean; cloudConnected: boolean; rememberedName: string | null
   filters: Filters; setFilters: (f: Filters) => void
   displayCurrency: "source" | "ZAR"; setDisplayCurrency: (currency: "source" | "ZAR") => void
   loadFromFile: (file: File) => Promise<void>; openSource: () => Promise<void>; reconnect: () => Promise<void>; forgetSource: () => Promise<void>
@@ -25,6 +25,8 @@ interface WorkbookContextValue {
   editRecords: (edits: { sheet: string; row: number | null; values: Record<string, CellValue>; action: "save" | "delete" }[]) => Promise<void>
 }
 const WorkbookContext = createContext<WorkbookContextValue | null>(null)
+const configuredRefresh = Number((import.meta as ImportMeta & { env: Record<string, string | undefined> }).env.VITE_REFRESH_INTERVAL_MS)
+const REFRESH_INTERVAL_MS = Number.isFinite(configuredRefresh) && configuredRefresh >= 5000 ? configuredRefresh : 30_000
 export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Account>(GUEST)
   const [result, setResult] = useState<ParseResult | null>(null)
@@ -64,7 +66,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     finally { busy.current = false; setLoading(false) }
   }
   function canReplace() { return !busy.current && (!dirty || window.confirm("Discard unsaved edits and reload or replace this workbook?")) }
-  async function install(file: File, connection: WorkbookHandle | null) {
+  async function install(file: File, connection: WorkbookHandle | null, preserveView = false) {
     if (!file.name.toLowerCase().endsWith(".xlsx")) throw new Error("Please select an .xlsx workbook.")
     const original = await file.arrayBuffer()
     const bytes = await ensureAccounts(original)
@@ -72,7 +74,9 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     if (!parsed.data) throw new Error("Workbook does not match the supported format: " + parsed.issues.filter(i => i.severity === "error").slice(0, 5).map(i => `${i.worksheet}: ${i.field ?? ""} ${i.message}`).join("; "))
     setResult(parsed); setBuffer(bytes); saved.current = original; handle.current = connection
     setSourceRevision(revision => revision + 1)
-    history.current = []; setConnected(!!connection); setDirty(bytes !== original); setFilters(EMPTY_FILTERS); setNotice(null); setSession(GUEST); setDownloaded(null)
+    history.current = []; setConnected(!!connection); setDirty(bytes !== original)
+    if (!preserveView) { setFilters(EMPTY_FILTERS); setSession(GUEST) }
+    setNotice(null); setDownloaded(null)
   }
   async function remember(connection: WorkbookHandle | null) {
     remembered.current = connection; setRememberedName(connection?.name ?? null)
@@ -88,7 +92,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
         cloudEtag.current = cloud.etag
         await install(new File([cloud.bytes], "firtech_dashboard.xlsx"), null)
         setCloudConnected(true); setConnected(true)
-        setNotice("Connected to the shared Excel workbook.")
+        setNotice("Connected to the SharePoint Excel workbook.")
         return
       }
       const response = await fetch("/firtech_dashboard.xlsx", { cache: "no-store" })
@@ -103,6 +107,22 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true }
   }, [])
   useEffect(() => {
+    if (!cloudConnected || dirty) return
+    const timer = window.setInterval(() => {
+      if (busy.current) return
+      busy.current = true
+      void readCloudWorkbook(cloudEtag.current ?? undefined).then(async cloud => {
+        if (!cloud) return
+        await install(new File([cloud.bytes], "firtech_dashboard.xlsx"), null, true)
+        cloudEtag.current = cloud.etag
+        setCloudConnected(true); setConnected(true)
+        setNotice("Updated from the SharePoint workbook.")
+      }).catch(e => setError(`Automatic refresh failed: ${message(e)}. Showing the last loaded workbook.`))
+        .finally(() => { busy.current = false })
+    }, REFRESH_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [cloudConnected, dirty])
+  useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = "" } }
     window.addEventListener("beforeunload", guard)
     return () => window.removeEventListener("beforeunload", guard)
@@ -111,10 +131,23 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     if (buffer) requireAdmin()
     interacted.current = true
     if (!canReplace()) return
-    await run(async () => { await install(file, null); setCloudConnected(false); cloudEtag.current = null; await remember(null) })
+    await run(async () => {
+      if (cloudConnected) {
+        const proposed = await ensureAccounts(await file.arrayBuffer())
+        const parsed = parseWorkbook(proposed, file.name)
+        assertWorkbookSaveable(parsed)
+        const revision = await writeCloudWorkbook(proposed, cloudEtag.current)
+        await install(new File([proposed], "firtech_dashboard.xlsx"), null)
+        cloudEtag.current = revision; setCloudConnected(true); setConnected(true)
+        setNotice("Replacement saved to the SharePoint workbook.")
+      } else {
+        await install(file, null); setCloudConnected(false); cloudEtag.current = null; await remember(null)
+      }
+    })
   }
   async function openSource() {
     if (buffer) requireAdmin()
+    if (cloudConnected) { setError("SharePoint is the active source. Use Import a copy to replace its workbook."); return }
     interacted.current = true
     if (!canReplace()) return
     await run(async () => {
@@ -138,7 +171,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   async function forgetSource() {
     requireAdmin()
     if (busy.current) return
-    if (cloudConnected) { setNotice("The shared Excel workbook stays connected."); return }
+    if (cloudConnected) { setNotice("The SharePoint workbook stays connected."); return }
     interacted.current = true; handle.current = null; setConnected(false)
     setNotice("File connection forgotten. Use Download Excel to keep any further edits.")
     await remember(null)
@@ -195,6 +228,7 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     await run(async () => {
       assertWorkbookSaveable(result)
       if (handle.current || cloudConnected) {
+        if (!dirty) { setNotice("The source workbook is already up to date."); return }
         if (handle.current && await handle.current.requestPermission({ mode: "readwrite" }) !== "granted") throw new Error("File access was denied. Your edits remain unsaved.")
         await persist(buffer, result)
       } else {
@@ -213,10 +247,10 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
     if (cloudConnected) {
       if (!canReplace()) return
       await run(async () => {
-        const cloud = await readCloudWorkbook()
-        if (!cloud) throw new Error("The shared Excel workbook has not been set up yet.")
+        const cloud = await readCloudWorkbook(cloudEtag.current ?? undefined)
+        if (!cloud) { setNotice("The SharePoint workbook is already up to date."); return }
         cloudEtag.current = cloud.etag
-        await install(new File([cloud.bytes], "firtech_dashboard.xlsx"), null)
+        await install(new File([cloud.bytes], "firtech_dashboard.xlsx"), null, true)
         setCloudConnected(true); setConnected(true)
       })
       return
@@ -228,11 +262,12 @@ export function WorkbookProvider({ children }: { children: React.ReactNode }) {
   }
   function clear() {
     requireAdmin()
+    if (cloudConnected) { setNotice("The SharePoint workbook remains the primary source. Use Refresh to reload it."); return }
     if (!canReplace()) return
     handle.current = null; saved.current = null; history.current = []
     cloudEtag.current = null; setCloudConnected(false); setConnected(false); setBuffer(null); setResult(null); setError(null); setNotice(null); setDirty(false); setFilters(EMPTY_FILTERS)
   }
-  return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, rememberedName, filters, setFilters, displayCurrency, setDisplayCurrency, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, editRecords, undo }}>{children}</WorkbookContext.Provider>
+  return <WorkbookContext.Provider value={{ downloadPending: !!downloaded, confirmDownload, user, signIn, signOut, result, buffer, dirty, canUndo: history.current.length > 0, loading, error, notice, sourceRevision, connected, cloudConnected, rememberedName, filters, setFilters, displayCurrency, setDisplayCurrency, loadFromFile, openSource, reconnect, forgetSource, exportWorkbook, refresh, clear, editRecord, editRecords, undo }}>{children}</WorkbookContext.Provider>
 }
 export function useWorkbook() {
   const ctx = useContext(WorkbookContext)

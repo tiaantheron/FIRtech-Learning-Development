@@ -52,7 +52,7 @@ const NAV: NavItem[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
-  const { downloadPending, confirmDownload, user, result, loading, loadFromFile, refresh, exportWorkbook, error, dirty, undo, canUndo, notice, sourceRevision, connected, rememberedName, openSource, reconnect, forgetSource } = useWorkbook()
+  const { downloadPending, confirmDownload, user, result, loading, loadFromFile, refresh, exportWorkbook, error, dirty, undo, canUndo, notice, sourceRevision, connected, cloudConnected, rememberedName, openSource, reconnect, forgetSource } = useWorkbook()
   const [importOpen, setImportOpen] = useState(false)
 
   const fileInput = useRef<HTMLInputElement>(null)
@@ -163,7 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="outline" size="sm" aria-label={connected ? "Save Excel workbook" : "Download Excel workbook"} onClick={exportWorkbook} disabled={loading || !result || user.Role !== "Administrator"}>
               <FileDown className="h-4 w-4" /><span className="hidden sm:inline">{connected ? "Save Excel" : "Download Excel"}</span>
             </Button>
-            <Button variant="outline" size="sm" aria-label="Refresh workbook" onClick={() => refresh()} disabled={loading || !result || user.Role !== "Administrator"}>
+            <Button variant="outline" size="sm" aria-label="Refresh workbook" onClick={() => refresh()} disabled={loading || !result}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
@@ -173,14 +173,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6 lg:py-8">
           {((!result && !loading) || importOpen) && <section className="mb-6 rounded-xl border border-border bg-card p-6 sm:p-10" aria-labelledby="open-workbook-title">
             <FileDown className="mb-4 h-9 w-9 text-primary" />
-            <h1 id="open-workbook-title" className="text-2xl font-semibold">Replace the Excel workbook</h1>
-            <p className="mt-3 max-w-2xl text-muted-foreground">The FIRtech reference workbook loads by default and establishes the worksheet format. Replace it with a workbook using that layout or the supported detailed 14-sheet format. Incompatible files are rejected without replacing the current dashboard.</p>
+            <h1 id="open-workbook-title" className="text-2xl font-semibold">{cloudConnected ? "Replace the SharePoint workbook" : "Open an Excel workbook"}</h1>
+            <p className="mt-3 max-w-2xl text-muted-foreground">{cloudConnected ? "The SharePoint workbook is the active source. An administrator can import a compatible workbook to replace it; changes then save back to SharePoint." : "The FIRtech reference workbook loads in local mode and establishes the worksheet format. Replace it with a compatible workbook."}</p>
               <p className="my-5 text-sm text-muted-foreground">Amounts display in their original workbook currencies by default. Use All in Rand to see values with documented ZAR conversions.</p>
-            <div className="flex flex-wrap items-center gap-4"><Button disabled={loading || (!!result && user.Role !== "Administrator")} onClick={() => { if (sourcePicker()) { void openSource(); setImportOpen(false) } else fileInput.current?.click() }}><Upload className="h-4 w-4" />Connect Excel file</Button><Button variant="outline" disabled={loading || (!!result && user.Role !== "Administrator")} onClick={() => fileInput.current?.click()}>Import a copy</Button>{user.Role === "Administrator" && <a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>}{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
-            <p className="mt-5 text-sm text-muted-foreground">With direct file access, applied edits save automatically to the chosen source workbook. Your browser remembers the connection for next time. Otherwise, download your edited workbook. Reports exports filtered tables separately.</p>
+            <div className="flex flex-wrap items-center gap-4">{!cloudConnected && <Button disabled={loading || (!!result && user.Role !== "Administrator")} onClick={() => { if (sourcePicker()) { void openSource(); setImportOpen(false) } else fileInput.current?.click() }}><Upload className="h-4 w-4" />Connect Excel file</Button>}<Button variant="outline" disabled={loading || (!!result && user.Role !== "Administrator")} onClick={() => fileInput.current?.click()}>{cloudConnected ? "Replace SharePoint workbook" : "Import a copy"}</Button>{user.Role === "Administrator" && <a href="/firtech_dashboard.xlsx" download className="text-sm font-medium underline">Download reference workbook</a>}{result && <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>}</div>
+            <p className="mt-5 text-sm text-muted-foreground">{cloudConnected ? "The app checks SharePoint for changes automatically and saves edits back to the same workbook. Reports export filtered tables separately." : "With direct file access, edits save to the chosen file. Otherwise, download your edited workbook."}</p>
           </section>}
           {user.Role === "Administrator" && !connected && rememberedName && <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4"><span className="text-sm">Remembered: {rememberedName}</span><Button disabled={loading} onClick={reconnect}>Reconnect workbook</Button><Button variant="outline" disabled={loading} onClick={forgetSource}>Forget file</Button></div>}
-          {result && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>{loading ? "Updating workbook…" : dirty ? "Pending changes — save or download to retain them." : connected ? "Autosave on · source workbook is up to date" : "Download mode · edits stay in this tab until you download Excel"}</span>{user.Role === "Administrator" && connected && <Button variant="ghost" size="sm" disabled={loading} onClick={forgetSource}>Forget file</Button>}<Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || loading || user.Role !== "Administrator"}>Undo last change</Button></div>}
+          {result && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span>{loading ? "Updating workbook…" : dirty ? "Pending changes — save or download to retain them." : cloudConnected ? "SharePoint connected · automatic refresh and save on" : connected ? "Autosave on · source workbook is up to date" : "Download mode · edits stay in this tab until you download Excel"}</span>{user.Role === "Administrator" && connected && !cloudConnected && <Button variant="ghost" size="sm" disabled={loading} onClick={forgetSource}>Forget file</Button>}<Button variant="outline" size="sm" onClick={undo} disabled={!canUndo || loading || user.Role !== "Administrator"}>Undo last change</Button></div>}
           {result && user.Role !== "Viewer" && !["/audit", "/reports", "/users", "/evidence"].includes(pathname) && <WorkbookEditor key={`${pathname}:${sourceRevision}:${user.Username}:${user.Role}`} route={pathname} />}
           {errorCount > 0 && <div role="alert" className="mb-5 rounded-lg border border-destructive p-4 text-sm">Calculations paused: {errorCount} workbook errors. <Link className="underline font-semibold" to="/validation">Open validation report</Link> and correct the workbook before replacing it.</div>}
           {result?.data && result.issues.some(i => i.severity === "warning") && <p className="mb-4 rounded-lg border border-border bg-card p-3 text-sm">Workbook loaded with {result.issues.filter(i => i.severity === "warning").length} notes about its data. {user.Role === "Administrator" && <Link to="/validation" className="font-medium underline">Review import notes</Link>}{result.data.overview.find(s => s.key === "DataStatus") && <span className="ml-2">Source status: {result.data.overview.find(s => s.key === "DataStatus")?.value}</span>}</p>}
@@ -188,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {downloadPending && user.Role === "Administrator" && <div className="mb-4 flex flex-wrap items-center gap-3 text-sm print:hidden"><Button variant="outline" disabled={loading} onClick={confirmDownload}>I saved the downloaded file</Button><span>If no file appeared, keep this tab open and use a desktop browser with downloads enabled.</span></div>}
           {error ? (
             <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}{!result && <Button variant="outline" className="ml-3" onClick={() => window.location.reload()}>Retry loading default</Button>}
+              {error}{!result && <Button variant="outline" className="ml-3" onClick={() => window.location.reload()}>Retry loading workbook</Button>}
             </div>
           ) : null}
           {loading && !result ? (

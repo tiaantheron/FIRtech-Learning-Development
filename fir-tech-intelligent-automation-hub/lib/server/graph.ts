@@ -1,6 +1,7 @@
 /** Microsoft Graph transport for one SharePoint workbook. Never import this module from the browser. */
 const GRAPH = "https://graph.microsoft.com/v1.0"
 const RETRYABLE = new Set([429, 502, 503, 504])
+const REQUEST_TIMEOUT_MS = 6_000
 
 export class GraphError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -29,12 +30,25 @@ export function graphConfig(env: NodeJS.ProcessEnv = process.env): GraphConfig {
 let tokenCache: { key: string; token: string; expires: number } | null = null
 let tokenPromise: Promise<string> | null = null
 
+async function timedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (controller.signal.aborted) throw new GraphError(504, "SharePoint did not respond in time. You can upload a compatible workbook and try again later.")
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 async function accessToken(config: GraphConfig): Promise<string> {
   const key = `${config.tenantId}:${config.clientId}`
   if (tokenCache?.key === key && Date.now() < tokenCache.expires) return tokenCache.token
   if (tokenPromise) return tokenPromise
   tokenPromise = (async () => {
-    const response = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`, {
+    const response = await timedFetch(`https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`, {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, scope: "https://graph.microsoft.com/.default", grant_type: "client_credentials" }),
     })
@@ -60,10 +74,10 @@ function retryDelay(response: Response, attempt: number) {
 async function request(config: GraphConfig, path: string, init: RequestInit = {}, retry = true): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const token = await accessToken(config)
-    const response = await fetch(`${GRAPH}${path}`, {
+    const response = await timedFetch(`${GRAPH}${path}`, {
       ...init, headers: { Authorization: `Bearer ${token}`, ...init.headers },
     })
-    if (retry && RETRYABLE.has(response.status) && attempt < 3) { await delay(retryDelay(response, attempt)); continue }
+    if (retry && RETRYABLE.has(response.status) && attempt < 1) { await delay(Math.min(retryDelay(response, attempt), 1_000)); continue }
     if (!response.ok) {
       if (response.status === 412) throw new GraphError(409, "The SharePoint workbook changed. Refresh before saving again.")
       if (response.status === 404) throw new GraphError(502, "The configured SharePoint workbook was not found.")
@@ -98,16 +112,13 @@ export async function getWorkbookRevision(config: GraphConfig, fresh = false): P
   try { return await promise } finally { if (revisionInFlight?.promise === promise) revisionInFlight = null }
 }
 
-export async function downloadWorkbook(config: GraphConfig) {
-  // Recheck the revision around the download so bytes and ETag refer to the same file version.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const before = await getWorkbookRevision(config, true)
-    const response = await request(config, `${itemPath(config)}/content`)
-    const bytes = await response.arrayBuffer()
-    const after = await getWorkbookRevision(config, true)
-    if (before.etag === after.etag) return { bytes, etag: after.etag, name: after.name }
-  }
-  throw new GraphError(409, "The SharePoint workbook kept changing during download. Try again.")
+export async function downloadWorkbook(config: GraphConfig, revision?: Revision) {
+  // The preceding metadata lookup supplies the revision used for this download.
+  // This avoids several Graph round trips during a serverless page load.
+  const current = revision ?? await getWorkbookRevision(config)
+  const response = await request(config, `${itemPath(config)}/content`)
+  const bytes = await response.arrayBuffer()
+  return { bytes, etag: current.etag, name: current.name }
 }
 
 export async function uploadWorkbook(config: GraphConfig, bytes: ArrayBuffer, expectedEtag: string) {
@@ -119,7 +130,7 @@ export async function uploadWorkbook(config: GraphConfig, bytes: ArrayBuffer, ex
   })
   const session = await sessionResponse.json() as { uploadUrl?: string }
   if (!session.uploadUrl?.startsWith("https://")) throw new GraphError(502, "Microsoft Graph returned no upload session URL.")
-  const response = await fetch(session.uploadUrl, {
+  const response = await timedFetch(session.uploadUrl, {
     method: "PUT", headers: { "Content-Length": String(bytes.byteLength), "Content-Range": `bytes 0-${bytes.byteLength - 1}/${bytes.byteLength}` }, body: bytes,
   })
   if (response.status === 412 || response.status === 409) throw new GraphError(409, "The SharePoint workbook changed. Refresh before saving again.")

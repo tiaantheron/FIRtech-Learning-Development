@@ -50,7 +50,7 @@ test("SharePoint API is disabled until deployment protection is configured", asy
   finally { if (previous === undefined) delete process.env.GRAPH_WORKBOOK_ENABLED; else process.env.GRAPH_WORKBOOK_ENABLED = previous }
 })
 
-test("SharePoint API rejects a workbook without its configured Excel Table", async () => {
+test("SharePoint API returns the source quickly and leaves full schema validation to the client", async () => {
   const previousFetch = globalThis.fetch
   const keys = ["TENANT_ID", "CLIENT_ID", "CLIENT_SECRET", "SITE_ID", "DRIVE_ID", "FILE_ID", "TABLE_NAME", "GRAPH_WORKBOOK_ENABLED"] as const
   const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]))
@@ -65,8 +65,8 @@ test("SharePoint API rejects a workbook without its configured Excel Table", asy
   }
   try {
     const response = await workbookHandler(new Request("https://app.example/api/workbook"))
-    assert.equal(response.status, 422)
-    assert.match(await response.text(), /Excel Table.*FIRtechData/)
+    assert.equal(response.status, 200)
+    assert.equal((await response.arrayBuffer()).byteLength, bytes.byteLength)
   } finally {
     globalThis.fetch = previousFetch
     keys.forEach(key => { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key] })

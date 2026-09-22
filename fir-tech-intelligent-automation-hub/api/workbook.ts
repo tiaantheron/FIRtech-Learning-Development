@@ -1,6 +1,4 @@
 import { GraphError, downloadWorkbook, getWorkbookRevision, graphConfig, uploadWorkbook } from "../lib/server/graph"
-import { parseWorkbook } from "../lib/services/parse"
-import { assertWorkbookSaveable } from "../lib/services/save-checks"
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const MAX_BYTES = 4_500_000
@@ -36,8 +34,6 @@ export default async function handler(request: Request): Promise<Response> {
     const body = await request.arrayBuffer()
     if (!body.byteLength || body.byteLength > MAX_BYTES) throw new GraphError(413, "An Excel workbook under 4.5 MB is required.")
     await requireConfiguredTable(body, config.tableName)
-    try { assertWorkbookSaveable(parseWorkbook(body, "sharepoint.xlsx")) }
-    catch (error) { throw new GraphError(422, error instanceof Error ? error.message : "The workbook failed validation.") }
     const etag = await uploadWorkbook(config, body, expectedEtag)
     return Response.json({ etag }, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {

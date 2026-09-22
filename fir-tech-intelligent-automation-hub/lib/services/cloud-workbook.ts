@@ -7,7 +7,8 @@ export interface CloudWorkbook {
 
 export async function readCloudWorkbook(etag?: string): Promise<CloudWorkbook | null> {
   const response = await fetch("/api/workbook", { cache: "no-store", headers: etag ? { "If-None-Match": etag } : {} })
-  if (response.status === 404 || response.status === 304) return null
+  if (response.status === 304) return null
+  if (response.status === 404) throw new Error("The configured SharePoint workbook was not found. Upload a compatible workbook or verify SITE_ID, DRIVE_ID, and FILE_ID.")
   if (!response.ok) throw new Error((await response.text()) || "Could not load the SharePoint workbook.")
   // Local Vite serves api/workbook.ts as a JavaScript module. Only a real workbook
   // response should override the bundled default file.

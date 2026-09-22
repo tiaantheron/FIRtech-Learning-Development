@@ -56,3 +56,13 @@ test("development API module does not replace the bundled Excel workbook", async
     globalThis.fetch = previousFetch
   }
 })
+
+test("a missing SharePoint workbook opens the workbook-selection recovery path", async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async () => new Response("Not found", { status: 404 })
+  try {
+    await assert.rejects(() => readCloudWorkbook(), /configured SharePoint workbook was not found/)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})

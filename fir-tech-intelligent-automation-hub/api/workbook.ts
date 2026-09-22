@@ -1,4 +1,6 @@
-import { GraphError, downloadWorkbook, getWorkbookRevision, graphConfig, uploadWorkbook } from "../lib/server/graph"
+// Keep the emitted Node ESM import explicit. Vercel runs the generated .js files
+// directly, where Node does not resolve an extensionless relative import.
+import { GraphError, downloadWorkbook, getWorkbookRevision, graphConfig, uploadWorkbook } from "../lib/server/graph.js"
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const MAX_BYTES = 4_500_000
